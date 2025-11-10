@@ -1,8 +1,9 @@
 
-// pages/index.js
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquarePlus, TrendingUp, Users, Monitor } from 'lucide-react';
+import { MessageSquarePlus, TrendingUp, Users, Monitor, Trash2 } from 'lucide-react';
+import { database } from '../lib/firebase';
+import { ref, push, onValue, set, update, remove } from 'firebase/database';
 
 export default function Home() {
   const [view, setView] = useState('user'); // 'user' or 'display'
@@ -45,93 +46,94 @@ function UserView() {
   const [questions, setQuestions] = useState([]);
   const [newQuestion, setNewQuestion] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deviceId, setDeviceId] = useState('');
 
+  // 获取或创建设备 ID
   useEffect(() => {
-    // 初始化数据
-    const stored = localStorage.getItem('questions');
-    if (stored) {
-      setQuestions(JSON.parse(stored));
+    let id = localStorage.getItem('deviceId');
+    if (!id) {
+      id = 'device_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+      localStorage.setItem('deviceId', id);
     }
-
-    // 监听storage变化实现实时更新
-    const handleStorage = () => {
-      const stored = localStorage.getItem('questions');
-      if (stored) {
-        setQuestions(JSON.parse(stored));
-      }
-    };
-
-    window.addEventListener('storage', handleStorage);
-    // 使用定时器模拟实时更新（同一页面storage事件不触发）
-    const interval = setInterval(() => {
-      const stored = localStorage.getItem('questions');
-      if (stored) {
-        setQuestions(JSON.parse(stored));
-      }
-    }, 1000);
-
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      clearInterval(interval);
-    };
+    setDeviceId(id);
   }, []);
 
-  const handleSubmit = (e) => {
+  // 实时监听问题列表
+  useEffect(() => {
+    const questionsRef = ref(database, 'questions');
+    
+    const unsubscribe = onValue(questionsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const questionsList = Object.keys(data).map(key => ({
+          id: key,
+          ...data[key]
+        }));
+        setQuestions(questionsList);
+      } else {
+        setQuestions([]);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!newQuestion.trim()) return;
+    if (!newQuestion.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
     
-    const question = {
-      id: Date.now(),
-      text: newQuestion.trim(),
-      votes: 0,
-      timestamp: new Date().toISOString(),
-      votedBy: []
-    };
+    try {
+      const questionsRef = ref(database, 'questions');
+      const newQuestionRef = push(questionsRef);
+      
+      await set(newQuestionRef, {
+        text: newQuestion.trim(),
+        votes: 0,
+        timestamp: Date.now(),
+        votedBy: {}
+      });
 
-    const updated = [question, ...questions];
-    setQuestions(updated);
-    localStorage.setItem('questions', JSON.stringify(updated));
-    
-    setTimeout(() => {
       setNewQuestion('');
+    } catch (error) {
+      console.error('提交问题失败:', error);
+      alert('提交失败，请重试');
+    } finally {
       setIsSubmitting(false);
-    }, 500);
-  };
-
-  const handleVote = (id) => {
-    const deviceId = getDeviceId();
-    const updated = questions.map(q => {
-      if (q.id === id) {
-        const hasVoted = q.votedBy?.includes(deviceId);
-        return {
-          ...q,
-          votes: hasVoted ? q.votes - 1 : q.votes + 1,
-          votedBy: hasVoted 
-            ? q.votedBy.filter(v => v !== deviceId)
-            : [...(q.votedBy || []), deviceId]
-        };
-      }
-      return q;
-    });
-    
-    setQuestions(updated);
-    localStorage.setItem('questions', JSON.stringify(updated));
-  };
-
-  const getDeviceId = () => {
-    let deviceId = localStorage.getItem('deviceId');
-    if (!deviceId) {
-      deviceId = 'device_' + Math.random().toString(36).substr(2, 9);
-      localStorage.setItem('deviceId', deviceId);
     }
-    return deviceId;
+  };
+
+  const handleVote = async (questionId) => {
+    if (!deviceId) return;
+
+    try {
+      const question = questions.find(q => q.id === questionId);
+      if (!question) return;
+
+      const hasVoted = question.votedBy && question.votedBy[deviceId];
+      const questionRef = ref(database, `questions/${questionId}`);
+
+      if (hasVoted) {
+        // 取消投票
+        await update(questionRef, {
+          votes: question.votes - 1,
+          [`votedBy/${deviceId}`]: null
+        });
+      } else {
+        // 投票
+        await update(questionRef, {
+          votes: question.votes + 1,
+          [`votedBy/${deviceId}`]: true
+        });
+      }
+    } catch (error) {
+      console.error('投票失败:', error);
+    }
   };
 
   const hasVoted = (question) => {
-    const deviceId = getDeviceId();
-    return question.votedBy?.includes(deviceId);
+    return question.votedBy && question.votedBy[deviceId];
   };
 
   const sortedQuestions = [...questions].sort((a, b) => b.votes - a.votes);
@@ -147,8 +149,12 @@ function UserView() {
         <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl mb-4 shadow-lg">
           <MessageSquarePlus className="w-8 h-8 text-white" />
         </div>
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">匿名提问</h1>
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">十万个为什么-CTS</h1>
         <p className="text-gray-600">畅所欲言，同问支持</p>
+        <div className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-full text-sm">
+          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+          实时同步中
+        </div>
       </motion.div>
 
       {/* 提问表单 */}
@@ -210,7 +216,9 @@ function UserView() {
                 <div className="flex-1">
                   <p className="text-gray-800 text-lg leading-relaxed">{question.text}</p>
                   <p className="text-xs text-gray-400 mt-2">
-                    {new Date(question.timestamp).toLocaleTimeString('zh-CN', {
+                    {new Date(question.timestamp).toLocaleString('zh-CN', {
+                      month: '2-digit',
+                      day: '2-digit',
                       hour: '2-digit',
                       minute: '2-digit'
                     })}
@@ -235,20 +243,49 @@ function UserView() {
 // 大屏展示界面
 function DisplayView() {
   const [questions, setQuestions] = useState([]);
+  const [showAdmin, setShowAdmin] = useState(false);
 
+  // 实时监听问题列表
   useEffect(() => {
-    const updateQuestions = () => {
-      const stored = localStorage.getItem('questions');
-      if (stored) {
-        setQuestions(JSON.parse(stored));
+    const questionsRef = ref(database, 'questions');
+    
+    const unsubscribe = onValue(questionsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const questionsList = Object.keys(data).map(key => ({
+          id: key,
+          ...data[key]
+        }));
+        setQuestions(questionsList);
+      } else {
+        setQuestions([]);
       }
-    };
+    });
 
-    updateQuestions();
-    const interval = setInterval(updateQuestions, 1000);
-
-    return () => clearInterval(interval);
+    return () => unsubscribe();
   }, []);
+
+  const handleDelete = async (questionId) => {
+    if (confirm('确定要删除这个问题吗？')) {
+      try {
+        const questionRef = ref(database, `questions/${questionId}`);
+        await remove(questionRef);
+      } catch (error) {
+        console.error('删除失败:', error);
+      }
+    }
+  };
+
+  const handleClearAll = async () => {
+    if (confirm('确定要清空所有问题吗？此操作不可恢复！')) {
+      try {
+        const questionsRef = ref(database, 'questions');
+        await set(questionsRef, null);
+      } catch (error) {
+        console.error('清空失败:', error);
+      }
+    }
+  };
 
   const topQuestions = [...questions]
     .sort((a, b) => b.votes - a.votes)
@@ -260,7 +297,7 @@ function DisplayView() {
       <motion.div
         initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-12"
+        className="text-center mb-12 relative"
       >
         <div className="inline-flex items-center gap-4 bg-white/80 backdrop-blur-sm px-8 py-4 rounded-3xl shadow-2xl">
           <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
@@ -271,6 +308,30 @@ function DisplayView() {
             <p className="text-gray-600">共 {questions.length} 个问题</p>
           </div>
         </div>
+
+        {/* 管理员按钮 */}
+        <button
+          onClick={() => setShowAdmin(!showAdmin)}
+          className="absolute right-0 top-0 px-4 py-2 bg-red-500 text-white rounded-full text-sm hover:bg-red-600 transition-all"
+        >
+          <Trash2 className="inline-block w-4 h-4 mr-1" />
+          管理
+        </button>
+
+        {showAdmin && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="absolute right-0 top-12 bg-white rounded-xl shadow-xl p-4 border-2 border-red-100"
+          >
+            <button
+              onClick={handleClearAll}
+              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"
+            >
+              清空所有问题
+            </button>
+          </motion.div>
+        )}
       </motion.div>
 
       {/* 问题展示 */}
@@ -283,7 +344,7 @@ function DisplayView() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 50 }}
               transition={{ delay: index * 0.1 }}
-              className="relative"
+              className="relative group"
             >
               <div className="flex items-center gap-6 bg-white/90 backdrop-blur-sm rounded-3xl p-8 shadow-2xl border-2 border-gray-100 hover:scale-102 transition-transform">
                 {/* 排名 */}
@@ -309,6 +370,16 @@ function DisplayView() {
                   <span className="text-4xl font-bold">{question.votes}</span>
                   <span className="text-sm opacity-90">同问</span>
                 </div>
+
+                {/* 删除按钮（hover 显示） */}
+                {showAdmin && (
+                  <button
+                    onClick={() => handleDelete(question.id)}
+                    className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 text-white p-2 rounded-lg hover:bg-red-600"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                )}
               </div>
             </motion.div>
           ))}
