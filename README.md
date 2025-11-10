@@ -220,6 +220,7 @@ MIT License - 自由使用和修改
    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=你的项目.appspot.com
    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=你的SENDER_ID
    NEXT_PUBLIC_FIREBASE_APP_ID=你的APP_ID
+   NEXT_PUBLIC_ADMIN_PASSWORD=Admin123
    ```
 
 3. **测试本地运行**
@@ -259,17 +260,18 @@ MIT License - 自由使用和修改
 
 ### 生产环境（推荐）
 ```json
-{
-  "rules": {
-    "questions": {
-      ".read": true,
-      ".write": true,
-      "$questionId": {
-        ".validate": "newData.hasChildren(['text', 'votes', 'timestamp', 'votedBy']) && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 500 && newData.child('votes').isNumber() && newData.child('timestamp').isNumber()"
-      }
-    }
-  }
-}
+    {
+     "rules": {
+       "questions": {
+         ".read": true,
+         ".write": true,
+         ".indexOn": ["votes", "timestamp"],
+         "$questionId": {
+           ".validate": "newData.val() === null || (newData.hasChildren(['text', 'votes', 'timestamp']) && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 500 && newData.child('votes').isNumber() && newData.child('votes').val() >= 0 && newData.child('timestamp').isNumber())"
+         }
+       }
+     }
+   }
 ```
 - ✅ 验证数据结构
 - ✅ 限制文本长度（500字符）
