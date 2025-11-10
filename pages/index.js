@@ -14,25 +14,25 @@ export default function Home() {
       <div className="fixed top-4 right-4 z-50 flex gap-2">
         <button
           onClick={() => setView('user')}
-          className={`px-4 py-2 rounded-full font-medium transition-all ${
+          className={`px-3 sm:px-4 py-2 rounded-full font-medium transition-all text-sm ${
             view === 'user'
               ? 'bg-purple-600 text-white shadow-lg'
               : 'bg-white text-gray-700 hover:bg-gray-100'
           }`}
         >
-          <Users className="inline-block w-4 h-4 mr-2" />
-          用户视图
+          <Users className="inline-block w-4 h-4 sm:mr-2" />
+          <span className="hidden sm:inline">用户视图</span>
         </button>
         <button
           onClick={() => setView('display')}
-          className={`px-4 py-2 rounded-full font-medium transition-all ${
+          className={`px-3 sm:px-4 py-2 rounded-full font-medium transition-all text-sm ${
             view === 'display'
               ? 'bg-blue-600 text-white shadow-lg'
               : 'bg-white text-gray-700 hover:bg-gray-100'
           }`}
         >
-          <Monitor className="inline-block w-4 h-4 mr-2" />
-          大屏视图
+          <Monitor className="inline-block w-4 h-4 sm:mr-2" />
+          <span className="hidden sm:inline">大屏视图</span>
         </button>
       </div>
 
@@ -192,35 +192,35 @@ function UserView() {
   const sortedQuestions = [...questions].sort((a, b) => b.votes - a.votes);
 
   return (
-    <div className="max-w-2xl mx-auto p-4 pb-24">
+    <div className="max-w-2xl mx-auto p-4 pb-24 pt-20">
       {/* 头部 */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center py-8"
+        className="text-center py-6 sm:py-8"
       >
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl mb-4 shadow-lg">
-          <MessageSquarePlus className="w-8 h-8 text-white" />
+        <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl mb-4 shadow-lg">
+          <MessageSquarePlus className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
         </div>
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">I CAN, We WILL</h1>
-        <p className="text-gray-600">畅所欲言，同问支持</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">I CAN, We WILL</h1>
+        <p className="text-sm sm:text-base text-gray-600">畅所欲言，同问支持</p>
         
         {/* 连接状态 */}
         <div className="mt-2">
           {connectionStatus === 'connected' && (
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-full text-sm">
+            <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-100 text-green-700 rounded-full text-xs sm:text-sm">
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
               实时同步中
             </div>
           )}
           {connectionStatus === 'connecting' && (
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-100 text-yellow-700 rounded-full text-sm">
+            <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-yellow-100 text-yellow-700 rounded-full text-xs sm:text-sm">
               <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
               连接中...
             </div>
           )}
           {connectionStatus === 'error' && (
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-full text-sm">
+            <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-red-100 text-red-700 rounded-full text-xs sm:text-sm">
               <AlertCircle className="w-4 h-4" />
               连接失败
             </div>
@@ -233,13 +233,13 @@ function UserView() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-4 p-4 bg-red-50 border-2 border-red-200 rounded-xl"
+          className="mb-4 p-3 sm:p-4 bg-red-50 border-2 border-red-200 rounded-xl"
         >
-          <div className="flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+          <div className="flex items-start gap-2 sm:gap-3">
+            <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="text-red-800 font-medium mb-1">错误</p>
-              <p className="text-red-600 text-sm">{error}</p>
+              <p className="text-red-800 font-medium mb-1 text-sm sm:text-base">错误</p>
+              <p className="text-red-600 text-xs sm:text-sm">{error}</p>
               <button
                 onClick={() => setError('')}
                 className="mt-2 text-xs text-red-500 hover:text-red-700 underline"
@@ -257,15 +257,15 @@ function UserView() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
         onSubmit={handleSubmit}
-        className="mb-8"
+        className="mb-6 sm:mb-8"
       >
-        <div className="bg-white rounded-2xl shadow-xl p-6 border-2 border-purple-100">
+        <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-6 border-2 border-purple-100">
           <textarea
             value={newQuestion}
             onChange={(e) => setNewQuestion(e.target.value)}
             placeholder="输入你的问题..."
             maxLength={500}
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none resize-none text-gray-800 placeholder-gray-400"
+            className="w-full px-3 sm:px-4 py-2 sm:py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none resize-none text-gray-800 placeholder-gray-400 text-sm sm:text-base"
             rows="4"
           />
           <div className="flex items-center justify-between mt-2">
@@ -276,7 +276,7 @@ function UserView() {
           <button
             type="submit"
             disabled={!newQuestion.trim() || isSubmitting || connectionStatus !== 'connected'}
-            className="w-full mt-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full mt-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-2.5 sm:py-3 rounded-xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
           >
             {isSubmitting ? '提交中...' : 
              connectionStatus !== 'connected' ? '等待连接...' : 
@@ -286,10 +286,10 @@ function UserView() {
       </motion.form>
 
       {/* 问题列表 */}
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-800">所有问题</h2>
-          <span className="text-sm text-gray-500">{questions.length} 个问题</span>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-800">所有问题</h2>
+          <span className="text-xs sm:text-sm text-gray-500">{questions.length} 个问题</span>
         </div>
 
         <AnimatePresence>
@@ -300,23 +300,23 @@ function UserView() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ delay: index * 0.05 }}
-              className="bg-white rounded-2xl shadow-lg p-6 border-2 border-gray-100 hover:border-purple-200 transition-all"
+              className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 border-2 border-gray-100 hover:border-purple-200 transition-all"
             >
-              <div className="flex gap-4">
+              <div className="flex gap-3 sm:gap-4">
                 <button
                   onClick={() => handleVote(question.id)}
-                  className={`flex flex-col items-center justify-center min-w-16 h-16 rounded-xl transition-all ${
+                  className={`flex flex-col items-center justify-center min-w-14 h-14 sm:min-w-16 sm:h-16 rounded-xl transition-all ${
                     hasVoted(question)
                       ? 'bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-lg scale-105'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
-                  <TrendingUp className="w-5 h-5 mb-1" />
-                  <span className="text-lg font-bold">{question.votes || 0}</span>
+                  <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 mb-1" />
+                  <span className="text-base sm:text-lg font-bold">{question.votes || 0}</span>
                 </button>
                 
-                <div className="flex-1">
-                  <p className="text-gray-800 text-lg leading-relaxed">{question.text}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-gray-800 text-base sm:text-lg leading-relaxed break-words">{question.text}</p>
                   <p className="text-xs text-gray-400 mt-2">
                     {new Date(question.timestamp).toLocaleString('zh-CN', {
                       month: '2-digit',
@@ -333,8 +333,8 @@ function UserView() {
 
         {questions.length === 0 && connectionStatus === 'connected' && (
           <div className="text-center py-12 text-gray-400">
-            <MessageSquarePlus className="w-16 h-16 mx-auto mb-4 opacity-50" />
-            <p>还没有问题，快来提问吧！</p>
+            <MessageSquarePlus className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 opacity-50" />
+            <p className="text-sm sm:text-base">还没有问题，快来提问吧！</p>
           </div>
         )}
       </div>
@@ -480,22 +480,22 @@ function DisplayView() {
     .slice(0, 10);
 
   return (
-    <div className="min-h-screen p-8 pt-20">
+    <div className="min-h-screen p-4 sm:p-8 pt-20 sm:pt-20">
       {/* 密码输入对话框 */}
       {showPasswordDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-2xl p-8 shadow-2xl max-w-md w-full mx-4"
+            className="bg-white rounded-2xl p-6 sm:p-8 shadow-2xl max-w-md w-full"
           >
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
-                <Lock className="w-6 h-6 text-red-600" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-red-100 rounded-xl flex items-center justify-center">
+                <Lock className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-gray-800">管理员验证</h2>
-                <p className="text-sm text-gray-600">请输入管理员密码</p>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-800">管理员验证</h2>
+                <p className="text-xs sm:text-sm text-gray-600">请输入管理员密码</p>
               </div>
             </div>
 
@@ -506,11 +506,11 @@ function DisplayView() {
                 onChange={(e) => setPasswordInput(e.target.value)}
                 placeholder="输入密码..."
                 autoFocus
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-red-400 focus:outline-none text-gray-800 placeholder-gray-400"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-red-400 focus:outline-none text-gray-800 placeholder-gray-400 text-sm sm:text-base"
               />
               
               {passwordError && (
-                <p className="mt-2 text-sm text-red-600 flex items-center gap-2">
+                <p className="mt-2 text-xs sm:text-sm text-red-600 flex items-center gap-2">
                   <AlertCircle className="w-4 h-4" />
                   {passwordError}
                 </p>
@@ -520,14 +520,14 @@ function DisplayView() {
                 <button
                   type="button"
                   onClick={handleCancelPassword}
-                  className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-all"
+                  className="flex-1 px-4 py-2.5 sm:py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-all text-sm sm:text-base"
                 >
                   取消
                 </button>
                 <button
                   type="submit"
                   disabled={!passwordInput}
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2.5 sm:py-3 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                 >
                   确认
                 </button>
@@ -542,31 +542,31 @@ function DisplayView() {
         {!isAuthenticated ? (
           <button
             onClick={handleAdminClick}
-            className="px-4 py-2 bg-red-500 text-white rounded-full text-sm hover:bg-red-600 transition-all shadow-lg flex items-center gap-2"
+            className="px-3 sm:px-4 py-2 bg-red-500 text-white rounded-full text-sm hover:bg-red-600 transition-all shadow-lg flex items-center gap-2"
           >
             <Lock className="w-4 h-4" />
-            管理登录
+            <span className="hidden sm:inline">管理登录</span>
           </button>
         ) : (
           <div className="flex flex-col gap-2">
             <div className="flex gap-2">
               <button
                 onClick={handleAdminClick}
-                className={`px-4 py-2 rounded-full text-sm transition-all flex items-center gap-2 shadow-lg ${
+                className={`px-3 sm:px-4 py-2 rounded-full text-sm transition-all flex items-center gap-2 shadow-lg ${
                   showAdmin 
                     ? 'bg-red-600 text-white' 
                     : 'bg-red-500 text-white hover:bg-red-600'
                 }`}
               >
                 <Trash2 className="w-4 h-4" />
-                {showAdmin ? '关闭管理' : '管理模式'}
+                <span className="hidden sm:inline">{showAdmin ? '关闭管理' : '管理模式'}</span>
               </button>
               <button
                 onClick={handleLogout}
-                className="px-4 py-2 bg-gray-500 text-white rounded-full text-sm hover:bg-gray-600 transition-all shadow-lg flex items-center gap-2"
+                className="px-3 sm:px-4 py-2 bg-gray-500 text-white rounded-full text-sm hover:bg-gray-600 transition-all shadow-lg flex items-center gap-2"
               >
                 <LogOut className="w-4 h-4" />
-                退出
+                <span className="hidden sm:inline">退出</span>
               </button>
             </div>
             
@@ -576,10 +576,11 @@ function DisplayView() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 onClick={handleClearAll}
-                className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 transition-all shadow-lg flex items-center gap-2"
+                className="px-3 sm:px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 transition-all shadow-lg flex items-center gap-2"
               >
                 <Trash2 className="w-4 h-4" />
-                清空所有问题
+                <span className="hidden sm:inline">清空所有问题</span>
+                <span className="sm:hidden">清空</span>
               </motion.button>
             )}
           </div>
@@ -590,15 +591,15 @@ function DisplayView() {
       <motion.div
         initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-12"
+        className="text-center mb-8 sm:mb-12"
       >
-        <div className="inline-flex items-center gap-4 bg-white/80 backdrop-blur-sm px-8 py-4 rounded-3xl shadow-2xl">
-          <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
-            <MessageSquarePlus className="w-6 h-6 text-white" />
+        <div className="inline-flex items-center gap-3 sm:gap-4 bg-white/80 backdrop-blur-sm px-4 sm:px-8 py-3 sm:py-4 rounded-3xl shadow-2xl">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+            <MessageSquarePlus className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
           </div>
           <div className="text-left">
-            <h1 className="text-4xl font-bold text-gray-800">CTS直播室</h1>
-            <p className="text-gray-600">共 {questions.length} 个问题</p>
+            <h1 className="text-2xl sm:text-4xl font-bold text-gray-800">实时问答墙</h1>
+            <p className="text-sm sm:text-base text-gray-600">共 {questions.length} 个问题</p>
           </div>
         </div>
 
@@ -607,16 +608,17 @@ function DisplayView() {
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-full text-sm"
+            className="mt-4 inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-red-100 text-red-700 rounded-full text-xs sm:text-sm"
           >
             <AlertCircle className="w-4 h-4" />
-            管理模式已启用 - 鼠标悬停在问题上可删除
+            <span className="hidden sm:inline">管理模式已启用 - 鼠标悬停在问题上可删除</span>
+            <span className="sm:hidden">管理模式</span>
           </motion.div>
         )}
       </motion.div>
 
       {/* 问题展示 */}
-      <div className="max-w-7xl mx-auto grid grid-cols-1 gap-6">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 gap-4 sm:gap-6">
         <AnimatePresence>
           {topQuestions.map((question, index) => (
             <motion.div
@@ -627,9 +629,9 @@ function DisplayView() {
               transition={{ delay: index * 0.1 }}
               className="relative group"
             >
-              <div className="flex items-center gap-6 bg-white/90 backdrop-blur-sm rounded-3xl p-8 shadow-2xl border-2 border-gray-100 hover:scale-102 transition-transform">
+              <div className="flex items-center gap-3 sm:gap-6 bg-white/90 backdrop-blur-sm rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-2xl border-2 border-gray-100 hover:scale-102 transition-transform">
                 {/* 排名 */}
-                <div className={`flex-shrink-0 w-20 h-20 rounded-2xl flex items-center justify-center text-3xl font-bold ${
+                <div className={`flex-shrink-0 w-14 h-14 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl flex items-center justify-center text-xl sm:text-3xl font-bold ${
                   index === 0 ? 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white shadow-lg' :
                   index === 1 ? 'bg-gradient-to-br from-gray-300 to-gray-400 text-white shadow-lg' :
                   index === 2 ? 'bg-gradient-to-br from-orange-300 to-orange-400 text-white shadow-lg' :
@@ -639,27 +641,27 @@ function DisplayView() {
                 </div>
 
                 {/* 问题内容 */}
-                <div className="flex-1">
-                  <p className="text-2xl text-gray-800 leading-relaxed font-medium">
+                <div className="flex-1 min-w-0">
+                  <p className="text-base sm:text-2xl text-gray-800 leading-relaxed font-medium break-words">
                     {question.text}
                   </p>
                 </div>
 
                 {/* 票数 */}
-                <div className="flex flex-col items-center gap-2 bg-gradient-to-br from-purple-500 to-pink-500 text-white px-8 py-6 rounded-2xl shadow-lg">
-                  <TrendingUp className="w-8 h-8" />
-                  <span className="text-4xl font-bold">{question.votes || 0}</span>
-                  <span className="text-sm opacity-90">同问</span>
+                <div className="flex flex-col items-center gap-1 sm:gap-2 bg-gradient-to-br from-purple-500 to-pink-500 text-white px-4 py-3 sm:px-8 sm:py-6 rounded-xl sm:rounded-2xl shadow-lg">
+                  <TrendingUp className="w-5 h-5 sm:w-8 sm:h-8" />
+                  <span className="text-2xl sm:text-4xl font-bold">{question.votes || 0}</span>
+                  <span className="text-xs sm:text-sm opacity-90">同问</span>
                 </div>
 
                 {/* 删除按钮（需要认证且管理模式开启时显示） */}
                 {showAdmin && isAuthenticated && (
                   <button
                     onClick={() => handleDelete(question.id)}
-                    className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 text-white p-3 rounded-xl hover:bg-red-600 shadow-lg"
+                    className="absolute top-2 right-2 sm:top-4 sm:right-4 opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 text-white p-2 sm:p-3 rounded-lg sm:rounded-xl hover:bg-red-600 shadow-lg"
                     title="删除此问题"
                   >
-                    <Trash2 className="w-5 h-5" />
+                    <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
                 )}
               </div>
@@ -671,12 +673,12 @@ function DisplayView() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-center py-24"
+            className="text-center py-16 sm:py-24"
           >
-            <div className="inline-flex items-center justify-center w-32 h-32 bg-white/80 rounded-full mb-6 shadow-xl">
-              <MessageSquarePlus className="w-16 h-16 text-gray-400" />
+            <div className="inline-flex items-center justify-center w-24 h-24 sm:w-32 sm:h-32 bg-white/80 rounded-full mb-6 shadow-xl">
+              <MessageSquarePlus className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400" />
             </div>
-            <p className="text-3xl text-gray-400 font-medium">等待问题中...</p>
+            <p className="text-2xl sm:text-3xl text-gray-400 font-medium">等待问题中...</p>
           </motion.div>
         )}
       </div>
