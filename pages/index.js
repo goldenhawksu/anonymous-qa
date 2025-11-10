@@ -545,7 +545,7 @@ function DisplayView() {
             className="px-4 py-2 bg-red-500 text-white rounded-full text-sm hover:bg-red-600 transition-all shadow-lg flex items-center gap-2"
           >
             <Lock className="w-4 h-4" />
-            管理员登录
+            管理登录
           </button>
         ) : (
           <div className="flex flex-col gap-2">
