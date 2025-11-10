@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquarePlus, TrendingUp, Users, Monitor, Trash2, AlertCircle } from 'lucide-react';
+import { MessageSquarePlus, TrendingUp, Users, Monitor, Trash2, AlertCircle, Lock } from 'lucide-react';
 import { database } from '../lib/firebase';
 import { ref, push, onValue, set, update, remove } from 'firebase/database';
 
@@ -123,12 +123,12 @@ function UserView() {
       // 确保数据格式完全匹配规则要求
       const questionData = {
         text: questionText,
-        votes: 0,  // 必须是数字 0，不是字符串
-        timestamp: Date.now(),  // 必须是数字时间戳
-        votedBy: {}  // 必须是空对象，不是 null 或 undefined
+        votes: 0,
+        timestamp: Date.now(),
+        votedBy: {}
       };
 
-      console.log('📤 正在提交问题，数据:', questionData);
+      console.log('📤 正在提交问题');
       
       await set(newQuestionRef, questionData);
 
@@ -136,16 +136,12 @@ function UserView() {
       setNewQuestion('');
       setError('');
     } catch (error) {
-      console.error('❌ 提交失败，错误详情:', error);
-      console.error('错误代码:', error.code);
-      console.error('错误消息:', error.message);
+      console.error('❌ 提交失败:', error);
       
-      // 详细的错误信息
       let errorMessage = '提交失败: ';
       
       if (error.code === 'PERMISSION_DENIED') {
-        errorMessage += '权限被拒绝。数据格式可能不符合安全规则要求。';
-        console.log('💡 提示：检查 Firebase 规则是否正确设置');
+        errorMessage += '权限被拒绝。请检查 Firebase 安全规则设置。';
       } else if (error.message.includes('network')) {
         errorMessage += '网络错误，请检查网络连接。';
       } else {
@@ -168,19 +164,15 @@ function UserView() {
       const hasVoted = question.votedBy && question.votedBy[deviceId];
       const questionRef = ref(database, `questions/${questionId}`);
 
-      // 计算新的票数
       const newVotes = hasVoted ? Math.max(0, question.votes - 1) : question.votes + 1;
 
       if (hasVoted) {
-        // 取消投票
         const updates = {
           votes: newVotes
         };
-        // 删除投票记录
         updates[`votedBy/${deviceId}`] = null;
         await update(questionRef, updates);
       } else {
-        // 投票
         const updates = {
           votes: newVotes,
           [`votedBy/${deviceId}`]: true
@@ -350,10 +342,17 @@ function UserView() {
   );
 }
 
-// 大屏展示界面
+// 大屏展示界面（带密码保护）
 function DisplayView() {
   const [questions, setQuestions] = useState([]);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+
+  // 从环境变量获取管理员密码
+  const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
 
   // 实时监听问题列表
   useEffect(() => {
@@ -380,7 +379,66 @@ function DisplayView() {
     return () => unsubscribe();
   }, []);
 
+  // 检查管理员密码是否已配置
+  useEffect(() => {
+    if (!ADMIN_PASSWORD) {
+      console.warn('⚠️ NEXT_PUBLIC_ADMIN_PASSWORD 未设置！管理功能将被禁用。');
+    }
+  }, [ADMIN_PASSWORD]);
+
+  const handleAdminClick = () => {
+    if (!ADMIN_PASSWORD) {
+      alert('管理员密码未配置！请在环境变量中设置 NEXT_PUBLIC_ADMIN_PASSWORD');
+      return;
+    }
+
+    if (!isAuthenticated) {
+      setShowPasswordDialog(true);
+      setPasswordInput('');
+      setPasswordError('');
+    } else {
+      setShowAdmin(!showAdmin);
+    }
+  };
+
+  const handlePasswordSubmit = (e) => {
+    e.preventDefault();
+    
+    if (passwordInput === ADMIN_PASSWORD) {
+      setIsAuthenticated(true);
+      setShowAdmin(true);
+      setShowPasswordDialog(false);
+      setPasswordInput('');
+      setPasswordError('');
+      
+      // 在 sessionStorage 中保存认证状态（刷新页面后失效，更安全）
+      sessionStorage.setItem('adminAuth', 'true');
+    } else {
+      setPasswordError('密码错误！');
+      setPasswordInput('');
+    }
+  };
+
+  const handleCancelPassword = () => {
+    setShowPasswordDialog(false);
+    setPasswordInput('');
+    setPasswordError('');
+  };
+
+  // 页面加载时检查 session 中的认证状态
+  useEffect(() => {
+    const authStatus = sessionStorage.getItem('adminAuth');
+    if (authStatus === 'true') {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
   const handleDelete = async (questionId) => {
+    if (!isAuthenticated) {
+      alert('需要管理员权限');
+      return;
+    }
+    
     if (confirm('确定要删除这个问题吗？')) {
       try {
         const questionRef = ref(database, `questions/${questionId}`);
@@ -393,15 +451,28 @@ function DisplayView() {
   };
 
   const handleClearAll = async () => {
+    if (!isAuthenticated) {
+      alert('需要管理员权限');
+      return;
+    }
+    
     if (confirm('确定要清空所有问题吗？此操作不可恢复！')) {
       try {
         const questionsRef = ref(database, 'questions');
         await set(questionsRef, null);
+        alert('已清空所有问题');
+        setShowAdmin(false);
       } catch (error) {
         console.error('清空失败:', error);
         alert('清空失败: ' + error.message);
       }
     }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setShowAdmin(false);
+    sessionStorage.removeItem('adminAuth');
   };
 
   const topQuestions = [...questions]
@@ -410,6 +481,62 @@ function DisplayView() {
 
   return (
     <div className="min-h-screen p-8">
+      {/* 密码输入对话框 */}
+      {showPasswordDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl p-8 shadow-2xl max-w-md w-full mx-4"
+          >
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+                <Lock className="w-6 h-6 text-red-600" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">管理员验证</h2>
+                <p className="text-sm text-gray-600">请输入管理员密码</p>
+              </div>
+            </div>
+
+            <form onSubmit={handlePasswordSubmit}>
+              <input
+                type="password"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                placeholder="输入密码..."
+                autoFocus
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-red-400 focus:outline-none text-gray-800 placeholder-gray-400"
+              />
+              
+              {passwordError && (
+                <p className="mt-2 text-sm text-red-600 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  {passwordError}
+                </p>
+              )}
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={handleCancelPassword}
+                  className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-all"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  disabled={!passwordInput}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  确认
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+
       {/* 大屏头部 */}
       <motion.div
         initial={{ opacity: 0, y: -30 }}
@@ -427,15 +554,39 @@ function DisplayView() {
         </div>
 
         {/* 管理员按钮 */}
-        <button
-          onClick={() => setShowAdmin(!showAdmin)}
-          className="absolute right-0 top-0 px-4 py-2 bg-red-500 text-white rounded-full text-sm hover:bg-red-600 transition-all"
-        >
-          <Trash2 className="inline-block w-4 h-4 mr-1" />
-          管理
-        </button>
+        <div className="absolute right-0 top-0">
+          {!isAuthenticated ? (
+            <button
+              onClick={handleAdminClick}
+              className="px-4 py-2 bg-red-500 text-white rounded-full text-sm hover:bg-red-600 transition-all flex items-center gap-2"
+            >
+              <Lock className="w-4 h-4" />
+              管理
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                onClick={handleAdminClick}
+                className={`px-4 py-2 rounded-full text-sm transition-all flex items-center gap-2 ${
+                  showAdmin 
+                    ? 'bg-red-600 text-white' 
+                    : 'bg-red-500 text-white hover:bg-red-600'
+                }`}
+              >
+                <Trash2 className="w-4 h-4" />
+                {showAdmin ? '关闭管理' : '打开管理'}
+              </button>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 bg-gray-500 text-white rounded-full text-sm hover:bg-gray-600 transition-all"
+              >
+                退出
+              </button>
+            </div>
+          )}
+        </div>
 
-        {showAdmin && (
+        {showAdmin && isAuthenticated && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -443,8 +594,9 @@ function DisplayView() {
           >
             <button
               onClick={handleClearAll}
-              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"
+              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all flex items-center gap-2"
             >
+              <Trash2 className="w-4 h-4" />
               清空所有问题
             </button>
           </motion.div>
@@ -488,8 +640,8 @@ function DisplayView() {
                   <span className="text-sm opacity-90">同问</span>
                 </div>
 
-                {/* 删除按钮（hover 显示） */}
-                {showAdmin && (
+                {/* 删除按钮（需要认证且管理模式开启时显示） */}
+                {showAdmin && isAuthenticated && (
                   <button
                     onClick={() => handleDelete(question.id)}
                     className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 text-white p-2 rounded-lg hover:bg-red-600"
