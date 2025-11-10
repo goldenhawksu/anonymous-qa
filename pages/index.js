@@ -598,7 +598,7 @@ function DisplayView() {
             <MessageSquarePlus className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
           </div>
           <div className="text-left">
-            <h1 className="text-2xl sm:text-4xl font-bold text-gray-800">实时问答墙</h1>
+            <h1 className="text-2xl sm:text-4xl font-bold text-gray-800">CTS直播室</h1>
             <p className="text-sm sm:text-base text-gray-600">共 {questions.length} 个问题</p>
           </div>
         </div>
