@@ -202,7 +202,7 @@ function UserView() {
         <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl mb-4 shadow-lg">
           <MessageSquarePlus className="w-8 h-8 text-white" />
         </div>
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">CTS-I Can, We Will!!!</h1>
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">I CAN, We WILL</h1>
         <p className="text-gray-600">畅所欲言，同问支持</p>
         
         {/* 连接状态 */}
