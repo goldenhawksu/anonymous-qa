@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquarePlus, TrendingUp, Users, Monitor, Trash2, AlertCircle, Lock } from 'lucide-react';
+import { MessageSquarePlus, TrendingUp, Users, Monitor, Trash2, AlertCircle, Lock, LogOut } from 'lucide-react';
 import { database } from '../lib/firebase';
 import { ref, push, onValue, set, update, remove } from 'firebase/database';
 
@@ -202,7 +202,7 @@ function UserView() {
         <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl mb-4 shadow-lg">
           <MessageSquarePlus className="w-8 h-8 text-white" />
         </div>
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">CTS-I can, We will~</h1>
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">CTS-I Can, We Will!!!</h1>
         <p className="text-gray-600">畅所欲言，同问支持</p>
         
         {/* 连接状态 */}
@@ -342,7 +342,7 @@ function UserView() {
   );
 }
 
-// 大屏展示界面（带密码保护）
+// 大屏展示界面（带密码保护 - 优化布局）
 function DisplayView() {
   const [questions, setQuestions] = useState([]);
   const [showAdmin, setShowAdmin] = useState(false);
@@ -480,7 +480,7 @@ function DisplayView() {
     .slice(0, 10);
 
   return (
-    <div className="min-h-screen p-8">
+    <div className="min-h-screen p-8 pt-20">
       {/* 密码输入对话框 */}
       {showPasswordDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -537,11 +537,60 @@ function DisplayView() {
         </div>
       )}
 
+      {/* 管理员工具栏 - 独立布局，避免与视图切换重叠 */}
+      <div className="fixed top-4 left-4 z-40">
+        {!isAuthenticated ? (
+          <button
+            onClick={handleAdminClick}
+            className="px-4 py-2 bg-red-500 text-white rounded-full text-sm hover:bg-red-600 transition-all shadow-lg flex items-center gap-2"
+          >
+            <Lock className="w-4 h-4" />
+            管理员登录
+          </button>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              <button
+                onClick={handleAdminClick}
+                className={`px-4 py-2 rounded-full text-sm transition-all flex items-center gap-2 shadow-lg ${
+                  showAdmin 
+                    ? 'bg-red-600 text-white' 
+                    : 'bg-red-500 text-white hover:bg-red-600'
+                }`}
+              >
+                <Trash2 className="w-4 h-4" />
+                {showAdmin ? '关闭管理' : '管理模式'}
+              </button>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 bg-gray-500 text-white rounded-full text-sm hover:bg-gray-600 transition-all shadow-lg flex items-center gap-2"
+              >
+                <LogOut className="w-4 h-4" />
+                退出
+              </button>
+            </div>
+            
+            {/* 清空所有按钮 - 管理模式开启时显示 */}
+            {showAdmin && (
+              <motion.button
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                onClick={handleClearAll}
+                className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 transition-all shadow-lg flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                清空所有问题
+              </motion.button>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* 大屏头部 */}
       <motion.div
         initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-12 relative"
+        className="text-center mb-12"
       >
         <div className="inline-flex items-center gap-4 bg-white/80 backdrop-blur-sm px-8 py-4 rounded-3xl shadow-2xl">
           <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
@@ -553,52 +602,15 @@ function DisplayView() {
           </div>
         </div>
 
-        {/* 管理员按钮 */}
-        <div className="absolute right-0 top-0">
-          {!isAuthenticated ? (
-            <button
-              onClick={handleAdminClick}
-              className="px-4 py-2 bg-red-500 text-white rounded-full text-sm hover:bg-red-600 transition-all flex items-center gap-2"
-            >
-              <Lock className="w-4 h-4" />
-              管理
-            </button>
-          ) : (
-            <div className="flex gap-2">
-              <button
-                onClick={handleAdminClick}
-                className={`px-4 py-2 rounded-full text-sm transition-all flex items-center gap-2 ${
-                  showAdmin 
-                    ? 'bg-red-600 text-white' 
-                    : 'bg-red-500 text-white hover:bg-red-600'
-                }`}
-              >
-                <Trash2 className="w-4 h-4" />
-                {showAdmin ? '关闭管理' : '打开管理'}
-              </button>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 bg-gray-500 text-white rounded-full text-sm hover:bg-gray-600 transition-all"
-              >
-                退出
-              </button>
-            </div>
-          )}
-        </div>
-
+        {/* 管理模式提示 */}
         {showAdmin && isAuthenticated && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="absolute right-0 top-12 bg-white rounded-xl shadow-xl p-4 border-2 border-red-100"
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-full text-sm"
           >
-            <button
-              onClick={handleClearAll}
-              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all flex items-center gap-2"
-            >
-              <Trash2 className="w-4 h-4" />
-              清空所有问题
-            </button>
+            <AlertCircle className="w-4 h-4" />
+            管理模式已启用 - 鼠标悬停在问题上可删除
           </motion.div>
         )}
       </motion.div>
@@ -644,7 +656,8 @@ function DisplayView() {
                 {showAdmin && isAuthenticated && (
                   <button
                     onClick={() => handleDelete(question.id)}
-                    className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 text-white p-2 rounded-lg hover:bg-red-600"
+                    className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 text-white p-3 rounded-xl hover:bg-red-600 shadow-lg"
+                    title="删除此问题"
                   >
                     <Trash2 className="w-5 h-5" />
                   </button>
