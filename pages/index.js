@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquarePlus, TrendingUp, Users, Monitor, Trash2 } from 'lucide-react';
+import { MessageSquarePlus, TrendingUp, Users, Monitor, Trash2, AlertCircle } from 'lucide-react';
 import { database } from '../lib/firebase';
 import { ref, push, onValue, set, update, remove } from 'firebase/database';
 
@@ -47,6 +47,8 @@ function UserView() {
   const [newQuestion, setNewQuestion] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deviceId, setDeviceId] = useState('');
+  const [error, setError] = useState('');
+  const [connectionStatus, setConnectionStatus] = useState('connecting');
 
   // 获取或创建设备 ID
   useEffect(() => {
@@ -60,20 +62,35 @@ function UserView() {
 
   // 实时监听问题列表
   useEffect(() => {
+    if (!database) {
+      setConnectionStatus('error');
+      setError('Firebase 未正确初始化');
+      return;
+    }
+
     const questionsRef = ref(database, 'questions');
     
-    const unsubscribe = onValue(questionsRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const questionsList = Object.keys(data).map(key => ({
-          id: key,
-          ...data[key]
-        }));
-        setQuestions(questionsList);
-      } else {
-        setQuestions([]);
+    const unsubscribe = onValue(questionsRef, 
+      (snapshot) => {
+        setConnectionStatus('connected');
+        setError('');
+        const data = snapshot.val();
+        if (data) {
+          const questionsList = Object.keys(data).map(key => ({
+            id: key,
+            ...data[key]
+          }));
+          setQuestions(questionsList);
+        } else {
+          setQuestions([]);
+        }
+      },
+      (error) => {
+        console.error('❌ Firebase 读取错误:', error);
+        setConnectionStatus('error');
+        setError(`读取失败: ${error.message}`);
       }
-    });
+    );
 
     return () => unsubscribe();
   }, []);
@@ -83,22 +100,59 @@ function UserView() {
     if (!newQuestion.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
+    setError('');
     
     try {
+      if (!database) {
+        throw new Error('Firebase 数据库未初始化');
+      }
+
+      const questionText = newQuestion.trim();
+      
+      // 验证文本长度
+      if (questionText.length === 0) {
+        throw new Error('问题不能为空');
+      }
+      if (questionText.length > 500) {
+        throw new Error('问题长度不能超过500字符');
+      }
+
       const questionsRef = ref(database, 'questions');
       const newQuestionRef = push(questionsRef);
       
-      await set(newQuestionRef, {
-        text: newQuestion.trim(),
-        votes: 0,
-        timestamp: Date.now(),
-        votedBy: {}
-      });
+      // 确保数据格式完全匹配规则要求
+      const questionData = {
+        text: questionText,
+        votes: 0,  // 必须是数字 0，不是字符串
+        timestamp: Date.now(),  // 必须是数字时间戳
+        votedBy: {}  // 必须是空对象，不是 null 或 undefined
+      };
 
+      console.log('📤 正在提交问题，数据:', questionData);
+      
+      await set(newQuestionRef, questionData);
+
+      console.log('✅ 问题提交成功');
       setNewQuestion('');
+      setError('');
     } catch (error) {
-      console.error('提交问题失败:', error);
-      alert('提交失败，请重试');
+      console.error('❌ 提交失败，错误详情:', error);
+      console.error('错误代码:', error.code);
+      console.error('错误消息:', error.message);
+      
+      // 详细的错误信息
+      let errorMessage = '提交失败: ';
+      
+      if (error.code === 'PERMISSION_DENIED') {
+        errorMessage += '权限被拒绝。数据格式可能不符合安全规则要求。';
+        console.log('💡 提示：检查 Firebase 规则是否正确设置');
+      } else if (error.message.includes('network')) {
+        errorMessage += '网络错误，请检查网络连接。';
+      } else {
+        errorMessage += error.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -114,21 +168,28 @@ function UserView() {
       const hasVoted = question.votedBy && question.votedBy[deviceId];
       const questionRef = ref(database, `questions/${questionId}`);
 
+      // 计算新的票数
+      const newVotes = hasVoted ? Math.max(0, question.votes - 1) : question.votes + 1;
+
       if (hasVoted) {
         // 取消投票
-        await update(questionRef, {
-          votes: question.votes - 1,
-          [`votedBy/${deviceId}`]: null
-        });
+        const updates = {
+          votes: newVotes
+        };
+        // 删除投票记录
+        updates[`votedBy/${deviceId}`] = null;
+        await update(questionRef, updates);
       } else {
         // 投票
-        await update(questionRef, {
-          votes: question.votes + 1,
+        const updates = {
+          votes: newVotes,
           [`votedBy/${deviceId}`]: true
-        });
+        };
+        await update(questionRef, updates);
       }
     } catch (error) {
-      console.error('投票失败:', error);
+      console.error('❌ 投票失败:', error);
+      setError(`投票失败: ${error.message}`);
     }
   };
 
@@ -149,13 +210,54 @@ function UserView() {
         <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl mb-4 shadow-lg">
           <MessageSquarePlus className="w-8 h-8 text-white" />
         </div>
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">十万个为什么-CTS</h1>
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">匿名提问</h1>
         <p className="text-gray-600">畅所欲言，同问支持</p>
-        <div className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-full text-sm">
-          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-          实时同步中
+        
+        {/* 连接状态 */}
+        <div className="mt-2">
+          {connectionStatus === 'connected' && (
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-full text-sm">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              实时同步中
+            </div>
+          )}
+          {connectionStatus === 'connecting' && (
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-100 text-yellow-700 rounded-full text-sm">
+              <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
+              连接中...
+            </div>
+          )}
+          {connectionStatus === 'error' && (
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-full text-sm">
+              <AlertCircle className="w-4 h-4" />
+              连接失败
+            </div>
+          )}
         </div>
       </motion.div>
+
+      {/* 错误提示 */}
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-4 p-4 bg-red-50 border-2 border-red-200 rounded-xl"
+        >
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-red-800 font-medium mb-1">错误</p>
+              <p className="text-red-600 text-sm">{error}</p>
+              <button
+                onClick={() => setError('')}
+                className="mt-2 text-xs text-red-500 hover:text-red-700 underline"
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* 提问表单 */}
       <motion.form
@@ -170,15 +272,23 @@ function UserView() {
             value={newQuestion}
             onChange={(e) => setNewQuestion(e.target.value)}
             placeholder="输入你的问题..."
+            maxLength={500}
             className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none resize-none text-gray-800 placeholder-gray-400"
             rows="4"
           />
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-xs text-gray-400">
+              {newQuestion.length}/500
+            </span>
+          </div>
           <button
             type="submit"
-            disabled={!newQuestion.trim() || isSubmitting}
+            disabled={!newQuestion.trim() || isSubmitting || connectionStatus !== 'connected'}
             className="w-full mt-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? '提交中...' : '提交问题'}
+            {isSubmitting ? '提交中...' : 
+             connectionStatus !== 'connected' ? '等待连接...' : 
+             '提交问题'}
           </button>
         </div>
       </motion.form>
@@ -210,7 +320,7 @@ function UserView() {
                   }`}
                 >
                   <TrendingUp className="w-5 h-5 mb-1" />
-                  <span className="text-lg font-bold">{question.votes}</span>
+                  <span className="text-lg font-bold">{question.votes || 0}</span>
                 </button>
                 
                 <div className="flex-1">
@@ -229,7 +339,7 @@ function UserView() {
           ))}
         </AnimatePresence>
 
-        {questions.length === 0 && (
+        {questions.length === 0 && connectionStatus === 'connected' && (
           <div className="text-center py-12 text-gray-400">
             <MessageSquarePlus className="w-16 h-16 mx-auto mb-4 opacity-50" />
             <p>还没有问题，快来提问吧！</p>
@@ -247,6 +357,11 @@ function DisplayView() {
 
   // 实时监听问题列表
   useEffect(() => {
+    if (!database) {
+      console.error('Firebase 未初始化');
+      return;
+    }
+
     const questionsRef = ref(database, 'questions');
     
     const unsubscribe = onValue(questionsRef, (snapshot) => {
@@ -272,6 +387,7 @@ function DisplayView() {
         await remove(questionRef);
       } catch (error) {
         console.error('删除失败:', error);
+        alert('删除失败: ' + error.message);
       }
     }
   };
@@ -283,12 +399,13 @@ function DisplayView() {
         await set(questionsRef, null);
       } catch (error) {
         console.error('清空失败:', error);
+        alert('清空失败: ' + error.message);
       }
     }
   };
 
   const topQuestions = [...questions]
-    .sort((a, b) => b.votes - a.votes)
+    .sort((a, b) => (b.votes || 0) - (a.votes || 0))
     .slice(0, 10);
 
   return (
@@ -367,7 +484,7 @@ function DisplayView() {
                 {/* 票数 */}
                 <div className="flex flex-col items-center gap-2 bg-gradient-to-br from-purple-500 to-pink-500 text-white px-8 py-6 rounded-2xl shadow-lg">
                   <TrendingUp className="w-8 h-8" />
-                  <span className="text-4xl font-bold">{question.votes}</span>
+                  <span className="text-4xl font-bold">{question.votes || 0}</span>
                   <span className="text-sm opacity-90">同问</span>
                 </div>
 
