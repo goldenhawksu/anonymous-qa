@@ -128,10 +128,10 @@ export default function Home() {
               <h2 className="text-2xl font-bold text-gray-800 mb-4">欢迎使用</h2>
               <div className="text-left space-y-3 mb-6">
                 <p className="text-gray-600">
-                  <strong>🏠 多会议室支持：</strong>为每个会议创建独立的房间
+                  <strong>🏠 多会议室支持：</strong>为每个会议创建独立房间
                 </p>
                 <p className="text-gray-600">
-                  <strong>💬 实时互动：</strong>提问、投票、回复，所有操作实时同步
+                  <strong>💬 实时互动：</strong>提问、投票、回复操作实时同步
                 </p>
                 <p className="text-gray-600">
                   <strong>📺 大屏展示：</strong>会议室大屏显示热门问题
