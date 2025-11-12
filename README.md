@@ -74,6 +74,42 @@ anonymous-qa-platform/
    ```
    - 点击"发布"
 
+## 🔒 Firebase安全规则说明
+
+### 测试阶段（当前配置）
+```json
+{
+  "rules": {
+    "questions": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}
+```
+- ✅ 任何人都可以读写
+- ✅ 适合开发和小型会议
+- ⚠️ 没有数据验证
+
+### 生产环境（推荐）
+```json
+    {
+     "rules": {
+       "questions": {
+         ".read": true,
+         ".write": true,
+         ".indexOn": ["votes", "timestamp"],
+         "$questionId": {
+           ".validate": "newData.val() === null || (newData.hasChildren(['text', 'votes', 'timestamp']) && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 500 && newData.child('votes').isNumber() && newData.child('votes').val() >= 0 && newData.child('timestamp').isNumber())"
+         }
+       }
+     }
+   }
+```
+- ✅ 验证数据结构
+- ✅ 限制文本长度（500字符）
+- ✅ 验证数据类型
+
 ## ⚙️ 第四步：配置项目
 
 ### 本地开发
@@ -113,42 +149,6 @@ anonymous-qa-platform/
 2. **重新部署**
    - Vercel 会自动重新部署
    - 或手动触发重新部署
-
-## 🔒 安全规则说明
-
-### 测试阶段（当前配置）
-```json
-{
-  "rules": {
-    "questions": {
-      ".read": true,
-      ".write": true
-    }
-  }
-}
-```
-- ✅ 任何人都可以读写
-- ✅ 适合开发和小型会议
-- ⚠️ 没有数据验证
-
-### 生产环境（推荐）
-```json
-    {
-     "rules": {
-       "questions": {
-         ".read": true,
-         ".write": true,
-         ".indexOn": ["votes", "timestamp"],
-         "$questionId": {
-           ".validate": "newData.val() === null || (newData.hasChildren(['text', 'votes', 'timestamp']) && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 500 && newData.child('votes').isNumber() && newData.child('votes').val() >= 0 && newData.child('timestamp').isNumber())"
-         }
-       }
-     }
-   }
-```
-- ✅ 验证数据结构
-- ✅ 限制文本长度（500字符）
-- ✅ 验证数据类型
 
 
 ## ✅ 测试清单
