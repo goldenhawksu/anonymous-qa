@@ -2,14 +2,19 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquarePlus, TrendingUp, Users, Monitor, Trash2, AlertCircle, Lock, LogOut, MessageCircle, Send, DoorOpen, X } from 'lucide-react';
+import { MessageSquarePlus, TrendingUp, Users, Monitor, Trash2, AlertCircle, Lock, LogOut, MessageCircle, Send, DoorOpen, X, Plus, Home as HomeIcon, Clock, Copy, Check } from 'lucide-react';
 import { database } from '../lib/firebase';
 import { ref, push, onValue, set, update, remove } from 'firebase/database';
 
 export default function Home() {
   const router = useRouter();
   const [view, setView] = useState('user'); // 'user' or 'display'
-  const [roomId, setRoomId] = useState('default');
+  const [roomId, setRoomId] = useState('CTS-MR25');
+  const [showRoomManager, setShowRoomManager] = useState(false);
+  const [newRoomInput, setNewRoomInput] = useState('');
+  const [recentRooms, setRecentRooms] = useState([]);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // 从 URL 获取房间 ID
   useEffect(() => {
@@ -18,50 +23,339 @@ export default function Home() {
       if (room && typeof room === 'string') {
         // 验证房间 ID 格式（只允许字母、数字、下划线、连字符）
         const sanitizedRoom = room.replace(/[^a-zA-Z0-9_-]/g, '').substring(0, 50);
-        setRoomId(sanitizedRoom || 'default');
+        setRoomId(sanitizedRoom || 'CTS-MR25');
+
+        // 添加到最近访问
+        addToRecentRooms(sanitizedRoom || 'CTS-MR25');
       } else {
-        setRoomId('default');
+        setRoomId('CTS-MR25');
       }
     }
   }, [router.isReady, router.query]);
 
+  // 加载最近访问的房间
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('recentRooms');
+      if (saved) {
+        setRecentRooms(JSON.parse(saved));
+      }
+
+      // 检查是否首次访问
+      const hasVisited = localStorage.getItem('hasVisited');
+      if (!hasVisited) {
+        setShowWelcome(true);
+        localStorage.setItem('hasVisited', 'true');
+      }
+    } catch (error) {
+      console.error('加载会议室历史失败:', error);
+    }
+  }, []);
+
+  // 添加到最近访问
+  const addToRecentRooms = (room) => {
+    try {
+      const saved = localStorage.getItem('recentRooms');
+      let rooms = saved ? JSON.parse(saved) : [];
+
+      // 移除重复
+      rooms = rooms.filter(r => r !== room);
+
+      // 添加到开头
+      rooms.unshift(room);
+
+      // 只保留最近10个
+      rooms = rooms.slice(0, 10);
+
+      localStorage.setItem('recentRooms', JSON.stringify(rooms));
+      setRecentRooms(rooms);
+    } catch (error) {
+      console.error('保存会议室历史失败:', error);
+    }
+  };
+
+  // 切换到房间
+  const switchToRoom = (room) => {
+    router.push(`/?room=${room}`);
+    setShowRoomManager(false);
+  };
+
+  // 创建新房间
+  const createNewRoom = () => {
+    if (!newRoomInput.trim()) return;
+
+    const sanitized = newRoomInput.trim().replace(/[^a-zA-Z0-9_-]/g, '').substring(0, 50);
+    if (sanitized) {
+      switchToRoom(sanitized);
+      setNewRoomInput('');
+    }
+  };
+
+  // 复制房间链接
+  const copyRoomLink = () => {
+    const url = `${window.location.origin}/?room=${roomId}`;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  // 清除最近访问记录
+  const clearRecentRooms = () => {
+    if (confirm('确定要清除所有最近访问记录吗?')) {
+      try {
+        localStorage.removeItem('recentRooms');
+        setRecentRooms([]);
+      } catch (error) {
+        console.error('清除历史记录失败:', error);
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
-      {/* 视图切换按钮 */}
-      <div className="fixed top-4 right-4 z-50 flex gap-2">
-        <button
-          onClick={() => setView('user')}
-          className={`px-3 sm:px-4 py-2 rounded-full font-medium transition-all text-sm ${
-            view === 'user'
-              ? 'bg-purple-600 text-white shadow-lg'
-              : 'bg-white text-gray-700 hover:bg-gray-100'
-          }`}
-        >
-          <Users className="inline-block w-4 h-4 sm:mr-2" />
-          <span className="hidden sm:inline">用户视图</span>
-        </button>
-        <button
-          onClick={() => setView('display')}
-          className={`px-3 sm:px-4 py-2 rounded-full font-medium transition-all text-sm ${
-            view === 'display'
-              ? 'bg-blue-600 text-white shadow-lg'
-              : 'bg-white text-gray-700 hover:bg-gray-100'
-          }`}
-        >
-          <Monitor className="inline-block w-4 h-4 sm:mr-2" />
-          <span className="hidden sm:inline">大屏视图</span>
-        </button>
-      </div>
-
-      {/* 房间信息显示 */}
-      {roomId !== 'default' && (
-        <div className="fixed top-20 right-4 z-40">
-          <div className="bg-white/90 backdrop-blur-sm px-3 py-2 rounded-full shadow-lg flex items-center gap-2 text-sm">
-            <DoorOpen className="w-4 h-4 text-purple-600" />
-            <span className="text-gray-700 font-medium">{roomId}</span>
-          </div>
+      {/* 欢迎引导弹窗 */}
+      {showWelcome && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl p-6 sm:p-8 shadow-2xl max-w-lg w-full"
+          >
+            <div className="text-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                <DoorOpen className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-4">欢迎使用</h2>
+              <div className="text-left space-y-3 mb-6">
+                <p className="text-gray-600">
+                  <strong>🏠 多会议室支持：</strong>为每个会议创建独立的房间
+                </p>
+                <p className="text-gray-600">
+                  <strong>💬 实时互动：</strong>提问、投票、回复，所有操作实时同步
+                </p>
+                <p className="text-gray-600">
+                  <strong>📺 大屏展示：</strong>会议室大屏显示热门问题
+                </p>
+              </div>
+              <div className="bg-purple-50 rounded-xl p-4 mb-6">
+                <p className="text-sm text-purple-800 font-medium mb-2">💡 快速开始：</p>
+                <p className="text-sm text-purple-700">
+                  点击左上角的 <strong>"会议室: CTS-MR25"</strong> 按钮,创建或切换到其他会议室
+                </p>
+              </div>
+              <button
+                onClick={() => setShowWelcome(false)}
+                className="w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-medium hover:shadow-lg transition-all"
+              >
+                开始使用
+              </button>
+            </div>
+          </motion.div>
         </div>
       )}
+
+      {/* 房间管理器弹窗 */}
+      {showRoomManager && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl p-6 sm:p-8 shadow-2xl max-w-md w-full max-h-[80vh] overflow-y-auto"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                  <DoorOpen className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-800">会议室管理</h2>
+                  <p className="text-xs text-gray-500">当前: {roomId}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowRoomManager(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* 当前房间信息 */}
+            <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border-2 border-purple-200">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="text-xs text-purple-600 font-medium mb-1">当前会议室</p>
+                  <p className="text-lg font-bold text-purple-900">{roomId}</p>
+                </div>
+                <button
+                  onClick={copyRoomLink}
+                  className="px-3 py-2 bg-white rounded-lg hover:bg-purple-100 transition-colors flex items-center gap-2 text-sm"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-4 h-4 text-green-600" />
+                      <span className="text-green-600">已复制</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4 text-purple-600" />
+                      <span className="text-purple-600">复制链接</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* 创建新房间 */}
+            <div className="mb-6">
+              <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                <Plus className="w-4 h-4" />
+                创建新会议室
+              </h3>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newRoomInput}
+                  onChange={(e) => setNewRoomInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && createNewRoom()}
+                  placeholder="输入会议室名称（英文/数字）"
+                  maxLength={50}
+                  className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-400 focus:outline-none text-sm"
+                />
+                <button
+                  onClick={createNewRoom}
+                  disabled={!newRoomInput.trim()}
+                  className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  创建
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                会议室名只能包含字母、数字、下划线和连字符
+              </p>
+            </div>
+
+            {/* 快捷房间 */}
+            <div className="mb-6">
+              <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                <HomeIcon className="w-4 h-4" />
+                快捷访问
+              </h3>
+              <button
+                onClick={() => switchToRoom('CTS-MR25')}
+                className={`w-full px-4 py-3 rounded-lg transition-all text-left ${
+                  roomId === 'CTS-MR25'
+                    ? 'bg-purple-100 border-2 border-purple-300'
+                    : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-pink-400 rounded-lg flex items-center justify-center">
+                      <HomeIcon className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-800">默认会议室</p>
+                      <p className="text-xs text-gray-500">CTS-MR25 公共问答区</p>
+                    </div>
+                  </div>
+                  {roomId === 'CTS-MR25' && (
+                    <span className="text-xs text-purple-600 font-medium">当前</span>
+                  )}
+                </div>
+              </button>
+            </div>
+
+            {/* 最近访问 */}
+            {recentRooms.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    最近访问
+                  </h3>
+                  <button
+                    onClick={clearRecentRooms}
+                    className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 px-2 py-1 hover:bg-red-50 rounded transition-colors"
+                    title="清除所有历史记录"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>清除</span>
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {recentRooms.map((room) => (
+                    <button
+                      key={room}
+                      onClick={() => switchToRoom(room)}
+                      className={`w-full px-4 py-3 rounded-lg transition-all text-left ${
+                        roomId === room
+                          ? 'bg-purple-100 border-2 border-purple-300'
+                          : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-400 rounded-lg flex items-center justify-center">
+                            <DoorOpen className="w-4 h-4 text-white" />
+                          </div>
+                          <p className="font-medium text-gray-800">{room}</p>
+                        </div>
+                        {roomId === room && (
+                          <span className="text-xs text-purple-600 font-medium">当前</span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </motion.div>
+        </div>
+      )}
+
+      {/* 顶部导航栏 */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+          {/* 左侧：房间按钮 */}
+          <button
+            onClick={() => setShowRoomManager(true)}
+            className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full hover:shadow-lg transition-all"
+          >
+            <DoorOpen className="w-4 h-4" />
+            <span className="font-medium text-sm sm:text-base max-w-[120px] sm:max-w-none truncate">
+              <span className="hidden sm:inline">会议室: </span>{roomId}
+            </span>
+            <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+          </button>
+
+          {/* 右侧：视图切换 */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setView('user')}
+              className={`px-3 sm:px-4 py-2 rounded-full font-medium transition-all text-sm ${
+                view === 'user'
+                  ? 'bg-purple-600 text-white shadow-lg'
+                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+              }`}
+            >
+              <Users className="inline-block w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">用户视图</span>
+            </button>
+            <button
+              onClick={() => setView('display')}
+              className={`px-3 sm:px-4 py-2 rounded-full font-medium transition-all text-sm ${
+                view === 'display'
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+              }`}
+            >
+              <Monitor className="inline-block w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">大屏视图</span>
+            </button>
+          </div>
+        </div>
+      </div>
 
       {view === 'user' ? <UserView roomId={roomId} /> : <DisplayView roomId={roomId} />}
     </div>
@@ -159,7 +453,7 @@ function UserView({ roomId }) {
         replies: {}
       };
 
-      console.log('📤 正在提交问题到房间:', roomId);
+      console.log('📤 正在提交问题到会议室:', roomId);
 
       await set(newQuestionRef, questionData);
 
@@ -254,7 +548,7 @@ function UserView({ roomId }) {
   const sortedQuestions = [...questions].sort((a, b) => b.votes - a.votes);
 
   return (
-    <div className="max-w-2xl mx-auto p-4 pb-24 pt-20">
+    <div className="max-w-2xl mx-auto p-4 pb-24 pt-24">
       {/* 头部 */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -626,7 +920,7 @@ function DisplayView({ roomId }) {
     .slice(0, 10);
 
   return (
-    <div className="min-h-screen p-4 sm:p-8 pt-20 sm:pt-20">
+    <div className="min-h-screen p-4 sm:p-8 pt-32 sm:pt-24">
       {/* 密码输入对话框 */}
       {showPasswordDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -684,7 +978,7 @@ function DisplayView({ roomId }) {
       )}
 
       {/* 管理员工具栏 */}
-      <div className="fixed top-4 left-4 z-40">
+      <div className="fixed top-20 sm:top-20 left-4 z-40 max-w-[calc(100vw-2rem)]">
         {!isAuthenticated ? (
           <button
             onClick={handleAdminClick}
@@ -695,7 +989,7 @@ function DisplayView({ roomId }) {
           </button>
         ) : (
           <div className="flex flex-col gap-2">
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <button
                 onClick={handleAdminClick}
                 className={`px-3 sm:px-4 py-2 rounded-full text-sm transition-all flex items-center gap-2 shadow-lg ${
@@ -706,6 +1000,7 @@ function DisplayView({ roomId }) {
               >
                 <Trash2 className="w-4 h-4" />
                 <span className="hidden sm:inline">{showAdmin ? '关闭管理' : '管理模式'}</span>
+                <span className="sm:hidden">{showAdmin ? '关闭' : '管理'}</span>
               </button>
               <button
                 onClick={handleLogout}
@@ -744,7 +1039,7 @@ function DisplayView({ roomId }) {
             <MessageSquarePlus className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
           </div>
           <div className="text-left">
-            <h1 className="text-2xl sm:text-4xl font-bold text-gray-800">CTS直播室</h1>
+            <h1 className="text-2xl sm:text-4xl font-bold text-gray-800">CTS在线互动</h1>
             <p className="text-sm sm:text-base text-gray-600">共 {questions.length} 个问题</p>
           </div>
         </div>
@@ -754,11 +1049,13 @@ function DisplayView({ roomId }) {
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mt-4 inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-red-100 text-red-700 rounded-full text-xs sm:text-sm"
+            className="mt-4 w-full"
           >
-            <AlertCircle className="w-4 h-4" />
-            <span className="hidden sm:inline">管理模式已启用 - 鼠标悬停在问题上可删除</span>
-            <span className="sm:hidden">管理模式</span>
+            <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-red-100 text-red-700 rounded-full text-xs sm:text-sm mx-auto">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span className="hidden sm:inline">管理模式已启用 - 鼠标悬停在问题上可删除</span>
+              <span className="sm:hidden">管理模式</span>
+            </div>
           </motion.div>
         )}
       </motion.div>
