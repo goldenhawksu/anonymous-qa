@@ -1,12 +1,29 @@
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquarePlus, TrendingUp, Users, Monitor, Trash2, AlertCircle, Lock, LogOut } from 'lucide-react';
+import { MessageSquarePlus, TrendingUp, Users, Monitor, Trash2, AlertCircle, Lock, LogOut, MessageCircle, Send, DoorOpen, X } from 'lucide-react';
 import { database } from '../lib/firebase';
 import { ref, push, onValue, set, update, remove } from 'firebase/database';
 
 export default function Home() {
+  const router = useRouter();
   const [view, setView] = useState('user'); // 'user' or 'display'
+  const [roomId, setRoomId] = useState('default');
+
+  // 从 URL 获取房间 ID
+  useEffect(() => {
+    if (router.isReady) {
+      const { room } = router.query;
+      if (room && typeof room === 'string') {
+        // 验证房间 ID 格式（只允许字母、数字、下划线、连字符）
+        const sanitizedRoom = room.replace(/[^a-zA-Z0-9_-]/g, '').substring(0, 50);
+        setRoomId(sanitizedRoom || 'default');
+      } else {
+        setRoomId('default');
+      }
+    }
+  }, [router.isReady, router.query]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
@@ -36,19 +53,32 @@ export default function Home() {
         </button>
       </div>
 
-      {view === 'user' ? <UserView /> : <DisplayView />}
+      {/* 房间信息显示 */}
+      {roomId !== 'default' && (
+        <div className="fixed top-20 right-4 z-40">
+          <div className="bg-white/90 backdrop-blur-sm px-3 py-2 rounded-full shadow-lg flex items-center gap-2 text-sm">
+            <DoorOpen className="w-4 h-4 text-purple-600" />
+            <span className="text-gray-700 font-medium">{roomId}</span>
+          </div>
+        </div>
+      )}
+
+      {view === 'user' ? <UserView roomId={roomId} /> : <DisplayView roomId={roomId} />}
     </div>
   );
 }
 
 // 用户提问界面（手机端）
-function UserView() {
+function UserView({ roomId }) {
   const [questions, setQuestions] = useState([]);
   const [newQuestion, setNewQuestion] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deviceId, setDeviceId] = useState('');
   const [error, setError] = useState('');
   const [connectionStatus, setConnectionStatus] = useState('connecting');
+  const [replyingTo, setReplyingTo] = useState(null); // 正在回复的问题 ID
+  const [replyText, setReplyText] = useState('');
+  const [expandedQuestions, setExpandedQuestions] = useState({}); // 展开的问题
 
   // 获取或创建设备 ID
   useEffect(() => {
@@ -68,9 +98,9 @@ function UserView() {
       return;
     }
 
-    const questionsRef = ref(database, 'questions');
-    
-    const unsubscribe = onValue(questionsRef, 
+    const questionsRef = ref(database, `rooms/${roomId}/questions`);
+
+    const unsubscribe = onValue(questionsRef,
       (snapshot) => {
         setConnectionStatus('connected');
         setError('');
@@ -93,7 +123,7 @@ function UserView() {
     );
 
     return () => unsubscribe();
-  }, []);
+  }, [roomId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -101,14 +131,14 @@ function UserView() {
 
     setIsSubmitting(true);
     setError('');
-    
+
     try {
       if (!database) {
         throw new Error('Firebase 数据库未初始化');
       }
 
       const questionText = newQuestion.trim();
-      
+
       // 验证文本长度
       if (questionText.length === 0) {
         throw new Error('问题不能为空');
@@ -117,19 +147,20 @@ function UserView() {
         throw new Error('问题长度不能超过500字符');
       }
 
-      const questionsRef = ref(database, 'questions');
+      const questionsRef = ref(database, `rooms/${roomId}/questions`);
       const newQuestionRef = push(questionsRef);
-      
+
       // 确保数据格式完全匹配规则要求
       const questionData = {
         text: questionText,
         votes: 0,
         timestamp: Date.now(),
-        votedBy: {}
+        votedBy: {},
+        replies: {}
       };
 
-      console.log('📤 正在提交问题');
-      
+      console.log('📤 正在提交问题到房间:', roomId);
+
       await set(newQuestionRef, questionData);
 
       console.log('✅ 问题提交成功');
@@ -137,9 +168,9 @@ function UserView() {
       setError('');
     } catch (error) {
       console.error('❌ 提交失败:', error);
-      
+
       let errorMessage = '提交失败: ';
-      
+
       if (error.code === 'PERMISSION_DENIED') {
         errorMessage += '权限被拒绝。请检查 Firebase 安全规则设置。';
       } else if (error.message.includes('network')) {
@@ -147,10 +178,34 @@ function UserView() {
       } else {
         errorMessage += error.message;
       }
-      
+
       setError(errorMessage);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleReplySubmit = async (questionId) => {
+    if (!replyText.trim()) return;
+
+    try {
+      const repliesRef = ref(database, `rooms/${roomId}/questions/${questionId}/replies`);
+      const newReplyRef = push(repliesRef);
+
+      const replyData = {
+        text: replyText.trim(),
+        timestamp: Date.now(),
+        deviceId: deviceId.substring(0, 12) + '...' // 匿名化
+      };
+
+      await set(newReplyRef, replyData);
+
+      setReplyText('');
+      setReplyingTo(null);
+      console.log('✅ 回复提交成功');
+    } catch (error) {
+      console.error('❌ 回复失败:', error);
+      setError(`回复失败: ${error.message}`);
     }
   };
 
@@ -162,7 +217,7 @@ function UserView() {
       if (!question) return;
 
       const hasVoted = question.votedBy && question.votedBy[deviceId];
-      const questionRef = ref(database, `questions/${questionId}`);
+      const questionRef = ref(database, `rooms/${roomId}/questions/${questionId}`);
 
       const newVotes = hasVoted ? Math.max(0, question.votes - 1) : question.votes + 1;
 
@@ -189,6 +244,13 @@ function UserView() {
     return question.votedBy && question.votedBy[deviceId];
   };
 
+  const toggleExpand = (questionId) => {
+    setExpandedQuestions(prev => ({
+      ...prev,
+      [questionId]: !prev[questionId]
+    }));
+  };
+
   const sortedQuestions = [...questions].sort((a, b) => b.votes - a.votes);
 
   return (
@@ -204,7 +266,7 @@ function UserView() {
         </div>
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">I CAN, We WILL</h1>
         <p className="text-sm sm:text-base text-gray-600">畅所欲言，同问支持</p>
-        
+
         {/* 连接状态 */}
         <div className="mt-2">
           {connectionStatus === 'connected' && (
@@ -278,8 +340,8 @@ function UserView() {
             disabled={!newQuestion.trim() || isSubmitting || connectionStatus !== 'connected'}
             className="w-full mt-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-2.5 sm:py-3 rounded-xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
           >
-            {isSubmitting ? '提交中...' : 
-             connectionStatus !== 'connected' ? '等待连接...' : 
+            {isSubmitting ? '提交中...' :
+             connectionStatus !== 'connected' ? '等待连接...' :
              '提交问题'}
           </button>
         </div>
@@ -293,42 +355,126 @@ function UserView() {
         </div>
 
         <AnimatePresence>
-          {sortedQuestions.map((question, index) => (
-            <motion.div
-              key={question.id}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ delay: index * 0.05 }}
-              className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 border-2 border-gray-100 hover:border-purple-200 transition-all"
-            >
-              <div className="flex gap-3 sm:gap-4">
-                <button
-                  onClick={() => handleVote(question.id)}
-                  className={`flex flex-col items-center justify-center min-w-14 h-14 sm:min-w-16 sm:h-16 rounded-xl transition-all ${
-                    hasVoted(question)
-                      ? 'bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-lg scale-105'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 mb-1" />
-                  <span className="text-base sm:text-lg font-bold">{question.votes || 0}</span>
-                </button>
-                
-                <div className="flex-1 min-w-0">
-                  <p className="text-gray-800 text-base sm:text-lg leading-relaxed break-words">{question.text}</p>
-                  <p className="text-xs text-gray-400 mt-2">
-                    {new Date(question.timestamp).toLocaleString('zh-CN', {
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </p>
+          {sortedQuestions.map((question, index) => {
+            const repliesArray = question.replies ? Object.keys(question.replies).map(key => ({
+              id: key,
+              ...question.replies[key]
+            })).sort((a, b) => a.timestamp - b.timestamp) : [];
+            const replyCount = repliesArray.length;
+            const isExpanded = expandedQuestions[question.id];
+
+            return (
+              <motion.div
+                key={question.id}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ delay: index * 0.05 }}
+                className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 border-2 border-gray-100 hover:border-purple-200 transition-all"
+              >
+                <div className="flex gap-3 sm:gap-4">
+                  <button
+                    onClick={() => handleVote(question.id)}
+                    className={`flex flex-col items-center justify-center min-w-14 h-14 sm:min-w-16 sm:h-16 rounded-xl transition-all ${
+                      hasVoted(question)
+                        ? 'bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-lg scale-105'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 mb-1" />
+                    <span className="text-base sm:text-lg font-bold">{question.votes || 0}</span>
+                  </button>
+
+                  <div className="flex-1 min-w-0">
+                    <p className="text-gray-800 text-base sm:text-lg leading-relaxed break-words">{question.text}</p>
+                    <div className="flex items-center gap-3 mt-2">
+                      <p className="text-xs text-gray-400">
+                        {new Date(question.timestamp).toLocaleString('zh-CN', {
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+
+                      {/* 回复按钮 */}
+                      <button
+                        onClick={() => toggleExpand(question.id)}
+                        className="text-xs text-purple-600 hover:text-purple-800 flex items-center gap-1"
+                      >
+                        <MessageCircle className="w-3 h-3" />
+                        {replyCount > 0 ? `${replyCount} 条回复` : '回复'}
+                      </button>
+                    </div>
+
+                    {/* 回复区域 */}
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mt-4 space-y-3"
+                      >
+                        {/* 显示所有回复 */}
+                        {repliesArray.map((reply) => (
+                          <div key={reply.id} className="bg-gray-50 rounded-xl p-3 border border-gray-200">
+                            <p className="text-sm text-gray-700">{reply.text}</p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              {new Date(reply.timestamp).toLocaleString('zh-CN', {
+                                month: '2-digit',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                          </div>
+                        ))}
+
+                        {/* 回复输入框 */}
+                        {replyingTo === question.id ? (
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={replyText}
+                              onChange={(e) => setReplyText(e.target.value)}
+                              placeholder="输入回复..."
+                              maxLength={200}
+                              className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-400 focus:outline-none text-sm"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => handleReplySubmit(question.id)}
+                              disabled={!replyText.trim()}
+                              className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <Send className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setReplyingTo(null);
+                                setReplyText('');
+                              }}
+                              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setReplyingTo(question.id)}
+                            className="text-sm text-purple-600 hover:text-purple-800 flex items-center gap-1"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                            添加回复
+                          </button>
+                        )}
+                      </motion.div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </AnimatePresence>
 
         {questions.length === 0 && connectionStatus === 'connected' && (
@@ -342,8 +488,8 @@ function UserView() {
   );
 }
 
-// 大屏展示界面（带密码保护 - 优化布局）
-function DisplayView() {
+// 大屏展示界面（带密码保护）
+function DisplayView({ roomId }) {
   const [questions, setQuestions] = useState([]);
   const [showAdmin, setShowAdmin] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -361,8 +507,8 @@ function DisplayView() {
       return;
     }
 
-    const questionsRef = ref(database, 'questions');
-    
+    const questionsRef = ref(database, `rooms/${roomId}/questions`);
+
     const unsubscribe = onValue(questionsRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
@@ -377,7 +523,7 @@ function DisplayView() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [roomId]);
 
   // 检查管理员密码是否已配置
   useEffect(() => {
@@ -403,14 +549,14 @@ function DisplayView() {
 
   const handlePasswordSubmit = (e) => {
     e.preventDefault();
-    
+
     if (passwordInput === ADMIN_PASSWORD) {
       setIsAuthenticated(true);
       setShowAdmin(true);
       setShowPasswordDialog(false);
       setPasswordInput('');
       setPasswordError('');
-      
+
       // 在 sessionStorage 中保存认证状态（刷新页面后失效，更安全）
       sessionStorage.setItem('adminAuth', 'true');
     } else {
@@ -438,10 +584,10 @@ function DisplayView() {
       alert('需要管理员权限');
       return;
     }
-    
+
     if (confirm('确定要删除这个问题吗？')) {
       try {
-        const questionRef = ref(database, `questions/${questionId}`);
+        const questionRef = ref(database, `rooms/${roomId}/questions/${questionId}`);
         await remove(questionRef);
       } catch (error) {
         console.error('删除失败:', error);
@@ -455,10 +601,10 @@ function DisplayView() {
       alert('需要管理员权限');
       return;
     }
-    
+
     if (confirm('确定要清空所有问题吗？此操作不可恢复！')) {
       try {
-        const questionsRef = ref(database, 'questions');
+        const questionsRef = ref(database, `rooms/${roomId}/questions`);
         await set(questionsRef, null);
         alert('已清空所有问题');
         setShowAdmin(false);
@@ -508,7 +654,7 @@ function DisplayView() {
                 autoFocus
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-red-400 focus:outline-none text-gray-800 placeholder-gray-400 text-sm sm:text-base"
               />
-              
+
               {passwordError && (
                 <p className="mt-2 text-xs sm:text-sm text-red-600 flex items-center gap-2">
                   <AlertCircle className="w-4 h-4" />
@@ -537,7 +683,7 @@ function DisplayView() {
         </div>
       )}
 
-      {/* 管理员工具栏 - 独立布局，避免与视图切换重叠 */}
+      {/* 管理员工具栏 */}
       <div className="fixed top-4 left-4 z-40">
         {!isAuthenticated ? (
           <button
@@ -553,8 +699,8 @@ function DisplayView() {
               <button
                 onClick={handleAdminClick}
                 className={`px-3 sm:px-4 py-2 rounded-full text-sm transition-all flex items-center gap-2 shadow-lg ${
-                  showAdmin 
-                    ? 'bg-red-600 text-white' 
+                  showAdmin
+                    ? 'bg-red-600 text-white'
                     : 'bg-red-500 text-white hover:bg-red-600'
                 }`}
               >
@@ -569,8 +715,8 @@ function DisplayView() {
                 <span className="hidden sm:inline">退出</span>
               </button>
             </div>
-            
-            {/* 清空所有按钮 - 管理模式开启时显示 */}
+
+            {/* 清空所有按钮 */}
             {showAdmin && (
               <motion.button
                 initial={{ opacity: 0, y: -10 }}
@@ -620,53 +766,63 @@ function DisplayView() {
       {/* 问题展示 */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 gap-4 sm:gap-6">
         <AnimatePresence>
-          {topQuestions.map((question, index) => (
-            <motion.div
-              key={question.id}
-              initial={{ opacity: 0, x: -50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 50 }}
-              transition={{ delay: index * 0.1 }}
-              className="relative group"
-            >
-              <div className="flex items-center gap-3 sm:gap-6 bg-white/90 backdrop-blur-sm rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-2xl border-2 border-gray-100 hover:scale-102 transition-transform">
-                {/* 排名 */}
-                <div className={`flex-shrink-0 w-14 h-14 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl flex items-center justify-center text-xl sm:text-3xl font-bold ${
-                  index === 0 ? 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white shadow-lg' :
-                  index === 1 ? 'bg-gradient-to-br from-gray-300 to-gray-400 text-white shadow-lg' :
-                  index === 2 ? 'bg-gradient-to-br from-orange-300 to-orange-400 text-white shadow-lg' :
-                  'bg-gray-100 text-gray-600'
-                }`}>
-                  #{index + 1}
-                </div>
+          {topQuestions.map((question, index) => {
+            const replyCount = question.replies ? Object.keys(question.replies).length : 0;
 
-                {/* 问题内容 */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-base sm:text-2xl text-gray-800 leading-relaxed font-medium break-words">
-                    {question.text}
-                  </p>
-                </div>
+            return (
+              <motion.div
+                key={question.id}
+                initial={{ opacity: 0, x: -50 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 50 }}
+                transition={{ delay: index * 0.1 }}
+                className="relative group"
+              >
+                <div className="flex items-center gap-3 sm:gap-6 bg-white/90 backdrop-blur-sm rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-2xl border-2 border-gray-100 hover:scale-102 transition-transform">
+                  {/* 排名 */}
+                  <div className={`flex-shrink-0 w-14 h-14 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl flex items-center justify-center text-xl sm:text-3xl font-bold ${
+                    index === 0 ? 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white shadow-lg' :
+                    index === 1 ? 'bg-gradient-to-br from-gray-300 to-gray-400 text-white shadow-lg' :
+                    index === 2 ? 'bg-gradient-to-br from-orange-300 to-orange-400 text-white shadow-lg' :
+                    'bg-gray-100 text-gray-600'
+                  }`}>
+                    #{index + 1}
+                  </div>
 
-                {/* 票数 */}
-                <div className="flex flex-col items-center gap-1 sm:gap-2 bg-gradient-to-br from-purple-500 to-pink-500 text-white px-4 py-3 sm:px-8 sm:py-6 rounded-xl sm:rounded-2xl shadow-lg">
-                  <TrendingUp className="w-5 h-5 sm:w-8 sm:h-8" />
-                  <span className="text-2xl sm:text-4xl font-bold">{question.votes || 0}</span>
-                  <span className="text-xs sm:text-sm opacity-90">同问</span>
-                </div>
+                  {/* 问题内容 */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-base sm:text-2xl text-gray-800 leading-relaxed font-medium break-words">
+                      {question.text}
+                    </p>
+                    {replyCount > 0 && (
+                      <div className="mt-2 flex items-center gap-1 text-sm text-purple-600">
+                        <MessageCircle className="w-4 h-4" />
+                        <span>{replyCount} 条回复</span>
+                      </div>
+                    )}
+                  </div>
 
-                {/* 删除按钮（需要认证且管理模式开启时显示） */}
-                {showAdmin && isAuthenticated && (
-                  <button
-                    onClick={() => handleDelete(question.id)}
-                    className="absolute top-2 right-2 sm:top-4 sm:right-4 opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 text-white p-2 sm:p-3 rounded-lg sm:rounded-xl hover:bg-red-600 shadow-lg"
-                    title="删除此问题"
-                  >
-                    <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
-                  </button>
-                )}
-              </div>
-            </motion.div>
-          ))}
+                  {/* 票数 */}
+                  <div className="flex flex-col items-center gap-1 sm:gap-2 bg-gradient-to-br from-purple-500 to-pink-500 text-white px-4 py-3 sm:px-8 sm:py-6 rounded-xl sm:rounded-2xl shadow-lg">
+                    <TrendingUp className="w-5 h-5 sm:w-8 sm:h-8" />
+                    <span className="text-2xl sm:text-4xl font-bold">{question.votes || 0}</span>
+                    <span className="text-xs sm:text-sm opacity-90">同问</span>
+                  </div>
+
+                  {/* 删除按钮 */}
+                  {showAdmin && isAuthenticated && (
+                    <button
+                      onClick={() => handleDelete(question.id)}
+                      className="absolute top-2 right-2 sm:top-4 sm:right-4 opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 text-white p-2 sm:p-3 rounded-lg sm:rounded-xl hover:bg-red-600 shadow-lg"
+                      title="删除此问题"
+                    >
+                      <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
         </AnimatePresence>
 
         {questions.length === 0 && (
