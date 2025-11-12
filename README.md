@@ -61,50 +61,49 @@ anonymous-qa-platform/
    - 在"规则"标签页，将规则改为：
    ```json
    {
-     "rules": {
-       "questions": {
-         ".read": true,
-         ".write": true,
-         "$questionId": {
-           ".validate": "newData.hasChildren(['text', 'votes', 'timestamp', 'votedBy'])"
+      "rules": {
+         "rooms": {
+            "$roomId": {
+               ".read": true,
+               ".write": true,
+               "questions": {
+                  ".read": true,
+                  ".write": true,
+                  "$questionId": {
+                     ".validate": "newData.hasChildren(['text', 'votes', 'timestamp'])"           
+                  }
+               }
+            }
          }
-       }
-     }
+      }
    }
    ```
    - 点击"发布"
 
 ## 🔒 Firebase安全规则说明
 
-### 测试阶段（当前配置）
-```json
-{
-  "rules": {
-    "questions": {
-      ".read": true,
-      ".write": true
-    }
-  }
-}
-```
-- ✅ 任何人都可以读写
-- ✅ 适合开发和小型会议
-- ⚠️ 没有数据验证
 
 ### 生产环境（推荐）
 ```json
-    {
-     "rules": {
-       "questions": {
-         ".read": true,
-         ".write": true,
-         ".indexOn": ["votes", "timestamp"],
-         "$questionId": {
-           ".validate": "newData.val() === null || (newData.hasChildren(['text', 'votes', 'timestamp']) && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 500 && newData.child('votes').isNumber() && newData.child('votes').val() >= 0 && newData.child('timestamp').isNumber())"
-         }
-       }
-     }
-   }
+{
+  "rules": {
+    "rooms": {
+      "$roomId": {
+        ".read": true,
+        ".write": true,
+        "questions": {
+          ".read": true,
+          ".write": true,
+          ".indexOn": ["votes", "timestamp"],
+          "$questionId": {
+            ".validate": "newData.val() === null || (newData.hasChildren(['text', 'votes', 'timestamp']) && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 500 && newData.child('votes').isNumber() && newData.child('votes').val() >= 0 && newData.child('timestamp').isNumber())"  
+        
+          }
+        }
+      }
+    }
+  }
+}
 ```
 - ✅ 验证数据结构
 - ✅ 限制文本长度（500字符）
@@ -124,7 +123,7 @@ anonymous-qa-platform/
    ```bash
    NEXT_PUBLIC_FIREBASE_API_KEY=你的_API_KEY
    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=你的项目.firebaseapp.com
-   NEXT_PUBLIC_FIREBASE_DATABASE_URL=https://你的项目.firebaseio.com
+   NEXT_PUBLIC_FIREBASE_DATABASE_URL=你的项目-default-rtdb.asia-southeast1.firebasedatabase.app
    NEXT_PUBLIC_FIREBASE_PROJECT_ID=你的项目ID
    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=你的项目.appspot.com
    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=你的SENDER_ID
