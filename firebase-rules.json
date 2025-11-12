@@ -1,0 +1,54 @@
+{
+  "rules": {
+    "rooms": {
+      ".read": true,
+
+      "$roomId": {
+        ".read": true,
+        ".write": true,
+
+        "questions": {
+          ".read": true,
+          ".write": true,
+          ".indexOn": ["votes", "timestamp"],
+
+          "$questionId": {
+            ".validate": "newData.val() === null || (newData.hasChildren(['text', 'votes', 'timestamp']))",
+
+            "text": {
+              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 500"
+            },
+
+            "votes": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000"
+            },
+
+            "timestamp": {
+              ".validate": "newData.isNumber() && newData.val() >= 1640000000000 && newData.val() <= now + 86400000"
+            },
+
+            "votedBy": {
+              "$deviceId": {
+                ".validate": "newData.isBoolean() || newData.val() === null"
+              }
+            },
+
+            "replies": {
+              "$replyId": {
+                "text": {
+                  ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 500"
+                },
+                "timestamp": {
+                  ".validate": "newData.isNumber()"
+                },
+                "deviceId": {
+                  ".validate": "newData.isString()"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

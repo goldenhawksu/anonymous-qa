@@ -84,30 +84,8 @@ anonymous-qa-platform/
 
 
 ### 生产环境（推荐）
-```json
-{
-  "rules": {
-    "rooms": {
-      "$roomId": {
-        ".read": true,
-        ".write": true,
-        "questions": {
-          ".read": true,
-          ".write": true,
-          ".indexOn": ["votes", "timestamp"],
-          "$questionId": {
-            ".validate": "newData.val() === null || (newData.hasChildren(['text', 'votes', 'timestamp']) && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 500 && newData.child('votes').isNumber() && newData.child('votes').val() >= 0 && newData.child('timestamp').isNumber())"  
-        
-          }
-        }
-      }
-    }
-  }
-}
-```
-- ✅ 验证数据结构
-- ✅ 限制文本长度（500字符）
-- ✅ 验证数据类型
+
+- ✅ 把firebase-rules.json里的内容粘贴至firebase的实时数据库里的“规则”页，发布
 
 ## ⚙️ 第四步：配置项目
 

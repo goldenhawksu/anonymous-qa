@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MessageSquarePlus, TrendingUp, Users, Monitor, Trash2, AlertCircle, Lock, LogOut, MessageCircle, Send, DoorOpen, X, Plus, Home as HomeIcon, Clock, Copy, Check } from 'lucide-react';
 import { database } from '../lib/firebase';
 import { ref, push, onValue, set, update, remove } from 'firebase/database';
+import { rateLimiters } from '../lib/rateLimit';
+import { cleanupStaleRooms, formatCleanupResult } from '../lib/roomCleanup';
 
 export default function Home() {
   const router = useRouter();
@@ -83,6 +85,13 @@ export default function Home() {
   // 创建新房间
   const createNewRoom = () => {
     if (!newRoomInput.trim()) return;
+
+    // 🔒 速率限制检查
+    const rateLimitCheck = rateLimiters.roomCreate.canPerformAction('createRoom');
+    if (!rateLimitCheck.allowed) {
+      alert(rateLimitCheck.message);
+      return;
+    }
 
     const sanitized = newRoomInput.trim().replace(/[^a-zA-Z0-9_-]/g, '').substring(0, 50);
     if (sanitized) {
@@ -423,6 +432,19 @@ function UserView({ roomId }) {
     e.preventDefault();
     if (!newQuestion.trim() || isSubmitting) return;
 
+    // 🔒 速率限制检查
+    const rateLimitCheck = rateLimiters.questionSubmit.canPerformAction('submitQuestion');
+    if (!rateLimitCheck.allowed) {
+      setError(rateLimitCheck.message);
+      return;
+    }
+
+    // 🔒 会议室问题数量限制检查（100个上限）
+    if (questions.length >= 100) {
+      setError('当前会议室已达到最大问题数量限制（100个），请等待管理员清理或切换到其他会议室');
+      return;
+    }
+
     setIsSubmitting(true);
     setError('');
 
@@ -482,6 +504,13 @@ function UserView({ roomId }) {
   const handleReplySubmit = async (questionId) => {
     if (!replyText.trim()) return;
 
+    // 🔒 速率限制检查
+    const rateLimitCheck = rateLimiters.reply.canPerformAction('reply');
+    if (!rateLimitCheck.allowed) {
+      setError(rateLimitCheck.message);
+      return;
+    }
+
     try {
       const repliesRef = ref(database, `rooms/${roomId}/questions/${questionId}/replies`);
       const newReplyRef = push(repliesRef);
@@ -505,6 +534,14 @@ function UserView({ roomId }) {
 
   const handleVote = async (questionId) => {
     if (!deviceId) return;
+
+    // 🔒 速率限制检查
+    const rateLimitCheck = rateLimiters.vote.canPerformAction('vote');
+    if (!rateLimitCheck.allowed) {
+      setError(rateLimitCheck.message);
+      setTimeout(() => setError(''), 2000); // 2秒后清除错误
+      return;
+    }
 
     try {
       const question = questions.find(q => q.id === questionId);
@@ -790,6 +827,7 @@ function DisplayView({ roomId }) {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [isCleaningRooms, setIsCleaningRooms] = useState(false);
 
   // 从环境变量获取管理员密码
   const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
@@ -909,6 +947,59 @@ function DisplayView({ roomId }) {
     }
   };
 
+  // 清理闲置会议室
+  const handleCleanupStaleRooms = async () => {
+    if (!isAuthenticated) {
+      alert('需要管理员权限');
+      return;
+    }
+
+    setIsCleaningRooms(true);
+
+    try {
+      // 先进行模拟运行，展示将要删除的会议室
+      const dryRunResult = await cleanupStaleRooms(true);
+
+      if (!dryRunResult.success) {
+        alert(`扫描失败: ${dryRunResult.error}`);
+        setIsCleaningRooms(false);
+        return;
+      }
+
+      if (dryRunResult.found === 0) {
+        alert('✅ 没有发现闲置30天以上的会议室');
+        setIsCleaningRooms(false);
+        return;
+      }
+
+      // 显示扫描结果并请求确认
+      const resultText = formatCleanupResult(dryRunResult);
+      const confirmed = confirm(
+        `${resultText}\n确定要删除这些闲置会议室吗？\n此操作不可恢复！`
+      );
+
+      if (!confirmed) {
+        setIsCleaningRooms(false);
+        return;
+      }
+
+      // 执行实际删除
+      const cleanupResult = await cleanupStaleRooms(false);
+
+      if (cleanupResult.success) {
+        const finalText = formatCleanupResult(cleanupResult);
+        alert(`✅ 清理完成\n\n${finalText}`);
+      } else {
+        alert(`❌ 清理失败: ${cleanupResult.error}`);
+      }
+    } catch (error) {
+      console.error('清理闲置会议室失败:', error);
+      alert(`清理失败: ${error.message}`);
+    } finally {
+      setIsCleaningRooms(false);
+    }
+  };
+
   const handleLogout = () => {
     setIsAuthenticated(false);
     setShowAdmin(false);
@@ -1013,16 +1104,35 @@ function DisplayView({ roomId }) {
 
             {/* 清空所有按钮 */}
             {showAdmin && (
-              <motion.button
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                onClick={handleClearAll}
-                className="px-3 sm:px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 transition-all shadow-lg flex items-center gap-2"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span className="hidden sm:inline">清空所有问题</span>
-                <span className="sm:hidden">清空</span>
-              </motion.button>
+              <>
+                <motion.button
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  onClick={handleClearAll}
+                  className="px-3 sm:px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 transition-all shadow-lg flex items-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">清空所有问题</span>
+                  <span className="sm:hidden">清空</span>
+                </motion.button>
+
+                {/* 清理闲置会议室按钮 */}
+                <motion.button
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  onClick={handleCleanupStaleRooms}
+                  disabled={isCleaningRooms}
+                  className="px-3 sm:px-4 py-2 bg-purple-500 text-white rounded-full text-sm hover:bg-purple-600 transition-all shadow-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Clock className="w-4 h-4" />
+                  <span className="hidden sm:inline">
+                    {isCleaningRooms ? '清理中...' : '清理闲置会议室'}
+                  </span>
+                  <span className="sm:hidden">
+                    {isCleaningRooms ? '清理中' : '清理'}
+                  </span>
+                </motion.button>
+              </>
             )}
           </div>
         )}
@@ -1039,7 +1149,7 @@ function DisplayView({ roomId }) {
             <MessageSquarePlus className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
           </div>
           <div className="text-left">
-            <h1 className="text-2xl sm:text-4xl font-bold text-gray-800">CTS在线互动</h1>
+            <h1 className="text-2xl sm:text-4xl font-bold text-gray-800">CTS on AIR</h1>
             <p className="text-sm sm:text-base text-gray-600">共 {questions.length} 个问题</p>
           </div>
         </div>
