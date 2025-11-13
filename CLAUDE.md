@@ -8,10 +8,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### 核心功能
 
+- **多会议室支持**：通过 URL 参数动态切换会议室（`?room=房间名`）
 - **双视图架构**：用户视图（提问端）+ 大屏视图（展示端）
 - **实时同步**：基于 Firebase Realtime Database 的实时数据同步
 - **防重复投票**：使用设备 ID 机制防止同一设备多次投票
-- **管理功能**：密码保护的管理模式，支持删除问题和清空所有问题
+- **交互式回复**：用户可以对问题进行回复和讨论
+- **速率限制**：客户端防滥用机制（提问、投票、回复、创建会议室）
+- **管理功能**：密码保护的管理模式，支持删除问题、清空所有问题、清理闲置会议室
+- **会议室管理**：最近访问历史、一键创建/切换会议室、复制房间链接
 - **响应式设计**：完整支持手机、平板、桌面和大屏显示
 
 ## 技术栈
@@ -32,10 +36,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```
 anonymous-qa/
 ├── lib/
-│   └── firebase.js          # Firebase 初始化和配置
+│   ├── firebase.js          # Firebase 初始化和配置
+│   ├── rateLimit.js         # 客户端速率限制器（防滥用）
+│   └── roomCleanup.js       # 会议室自动清理工具
 ├── pages/
 │   ├── _app.js              # Next.js 应用入口
-│   └── index.js             # 主应用（用户视图 + 大屏视图）
+│   └── index.js             # 主应用（用户视图 + 大屏视图 + 会议室管理）
 ├── styles/
 │   └── globals.css          # 全局样式
 ├── .env.local               # 本地环境变量（不提交到 Git）
@@ -87,19 +93,33 @@ npm run lint
 
 ### 数据模型
 
-Firebase Realtime Database 结构：
+Firebase Realtime Database 结构（多会议室架构）：
 
 ```json
 {
-  "questions": {
-    "question_id_1": {
-      "text": "问题文本",
-      "votes": 0,
-      "timestamp": 1234567890,
-      "votedBy": {
-        "device_id_1": true,
-        "device_id_2": true
+  "rooms": {
+    "CTS-MR25": {
+      "questions": {
+        "question_id_1": {
+          "text": "问题文本",
+          "votes": 0,
+          "timestamp": 1234567890,
+          "votedBy": {
+            "device_id_1": true,
+            "device_id_2": true
+          },
+          "replies": {
+            "reply_id_1": {
+              "text": "回复内容",
+              "timestamp": 1234567900,
+              "deviceId": "device_123...（匿名化）"
+            }
+          }
+        }
       }
+    },
+    "其他会议室名": {
+      "questions": { /* ... */ }
     }
   }
 }
@@ -107,16 +127,25 @@ Firebase Realtime Database 结构：
 
 ### 关键字段说明
 
+**问题字段：**
 - `text` (string): 问题内容，1-500 字符
 - `votes` (number): 当前票数（同问数）
 - `timestamp` (number): 创建时间戳
 - `votedBy` (object): 投票记录，key 为设备 ID，value 为 true
+- `replies` (object): 回复列表，key 为回复 ID
+
+**回复字段：**
+- `text` (string): 回复内容，1-200 字符
+- `timestamp` (number): 回复时间戳
+- `deviceId` (string): 匿名化的设备标识（仅显示前12位）
 
 ### 数据流
 
 ```
-用户提交问题 → Firebase Realtime Database → 实时同步到所有连接的客户端
+用户访问 /?room=房间名 → 动态切换会议室
+用户提交问题 → Firebase /rooms/{roomId}/questions → 实时同步到所有连接的客户端
 用户投票 → 更新 votes 和 votedBy → 实时同步排序
+用户回复 → Firebase /rooms/{roomId}/questions/{questionId}/replies → 实时显示
 管理员删除 → Firebase remove() → 所有客户端自动更新
 ```
 

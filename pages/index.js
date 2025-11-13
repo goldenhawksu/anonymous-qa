@@ -1068,74 +1068,77 @@ function DisplayView({ roomId }) {
         </div>
       )}
 
-      {/* 管理员工具栏 */}
-      <div className="fixed top-20 sm:top-20 left-4 z-40 max-w-[calc(100vw-2rem)]">
-        {!isAuthenticated ? (
-          <button
-            onClick={handleAdminClick}
-            className="px-3 sm:px-4 py-2 bg-red-500 text-white rounded-full text-sm hover:bg-red-600 transition-all shadow-lg flex items-center gap-2"
-          >
-            <Lock className="w-4 h-4" />
-            <span className="hidden sm:inline">管理登录</span>
-          </button>
-        ) : (
-          <div className="flex flex-col gap-2">
-            <div className="flex gap-2 flex-wrap">
+      {/* 管理员工具栏 - 与顶部导航栏右对齐 */}
+      <div className="fixed top-20 sm:top-20 left-0 right-0 z-40 pointer-events-none">
+        <div className="max-w-7xl mx-auto px-4 flex justify-end">
+          <div className="flex flex-col items-end gap-2 pointer-events-auto">
+            {!isAuthenticated ? (
               <button
                 onClick={handleAdminClick}
-                className={`px-3 sm:px-4 py-2 rounded-full text-sm transition-all flex items-center gap-2 shadow-lg ${
-                  showAdmin
-                    ? 'bg-red-600 text-white'
-                    : 'bg-red-500 text-white hover:bg-red-600'
-                }`}
+                className="px-3 sm:px-4 py-2 bg-red-500 text-white rounded-full text-sm hover:bg-red-600 transition-all shadow-lg flex items-center gap-2"
               >
-                <Trash2 className="w-4 h-4" />
-                <span className="hidden sm:inline">{showAdmin ? '关闭管理' : '管理模式'}</span>
-                <span className="sm:hidden">{showAdmin ? '关闭' : '管理'}</span>
+                <Lock className="w-4 h-4" />
+                <span className="hidden sm:inline">管理登录</span>
               </button>
-              <button
-                onClick={handleLogout}
-                className="px-3 sm:px-4 py-2 bg-gray-500 text-white rounded-full text-sm hover:bg-gray-600 transition-all shadow-lg flex items-center gap-2"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">退出</span>
-              </button>
-            </div>
-
-            {/* 清空所有按钮 */}
-            {showAdmin && (
+            ) : (
               <>
-                <motion.button
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  onClick={handleClearAll}
-                  className="px-3 sm:px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 transition-all shadow-lg flex items-center gap-2"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span className="hidden sm:inline">清空所有问题</span>
-                  <span className="sm:hidden">清空</span>
-                </motion.button>
+                <div className="flex gap-2 flex-wrap justify-end">
+                  <button
+                    onClick={handleAdminClick}
+                    className={`px-3 sm:px-4 py-2 rounded-full text-sm transition-all flex items-center gap-2 shadow-lg ${
+                      showAdmin
+                        ? 'bg-red-600 text-white'
+                        : 'bg-red-500 text-white hover:bg-red-600'
+                    }`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span className="hidden sm:inline">{showAdmin ? '关闭管理' : '管理模式'}</span>
+                    <span className="sm:hidden">{showAdmin ? '关闭' : '管理'}</span>
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="px-3 sm:px-4 py-2 bg-gray-500 text-white rounded-full text-sm hover:bg-gray-600 transition-all shadow-lg flex items-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span className="hidden sm:inline">退出</span>
+                  </button>
+                </div>
 
-                {/* 清理闲置会议室按钮 */}
-                <motion.button
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  onClick={handleCleanupStaleRooms}
-                  disabled={isCleaningRooms}
-                  className="px-3 sm:px-4 py-2 bg-purple-500 text-white rounded-full text-sm hover:bg-purple-600 transition-all shadow-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Clock className="w-4 h-4" />
-                  <span className="hidden sm:inline">
-                    {isCleaningRooms ? '清理中...' : '清理闲置会议室'}
-                  </span>
-                  <span className="sm:hidden">
-                    {isCleaningRooms ? '清理中' : '清理'}
-                  </span>
-                </motion.button>
+                {/* 管理功能按钮 */}
+                {showAdmin && (
+                  <div className="flex flex-col gap-2 items-end w-full">
+                    <motion.button
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      onClick={handleClearAll}
+                      className="px-3 sm:px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 transition-all shadow-lg flex items-center gap-2"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span className="hidden sm:inline">清空所有问题</span>
+                      <span className="sm:hidden">清空</span>
+                    </motion.button>
+
+                    <motion.button
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      onClick={handleCleanupStaleRooms}
+                      disabled={isCleaningRooms}
+                      className="px-3 sm:px-4 py-2 bg-purple-500 text-white rounded-full text-sm hover:bg-purple-600 transition-all shadow-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Clock className="w-4 h-4" />
+                      <span className="hidden sm:inline">
+                        {isCleaningRooms ? '清理中...' : '清理闲置会议室'}
+                      </span>
+                      <span className="sm:hidden">
+                        {isCleaningRooms ? '清理中' : '清理'}
+                      </span>
+                    </motion.button>
+                  </div>
+                )}
               </>
             )}
           </div>
-        )}
+        </div>
       </div>
 
       {/* 大屏头部 */}
