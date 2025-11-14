@@ -3,20 +3,21 @@
 ## 📁 完整项目结构
 
 ```
-anonymous-qa-platform/
+anonymous-qa/
 ├── lib/
-│   └── firebase.js          ← Firebase 初始化
+│   ├── firebase.js          # Firebase 初始化和配置
+│   ├── rateLimit.js         # 客户端速率限制器（防滥用）
+│   └── roomCleanup.js       # 会议室自动清理工具
 ├── pages/
-│   ├── _app.js
-│   └── index.js             ← 主应用（已更新）
+│   ├── _app.js              # Next.js 应用入口
+│   └── index.js             # 主应用（用户视图 + 大屏视图 + 会议室管理）
 ├── styles/
-│   └── globals.css
-├── .env.local               ← 本地环境变量（不要提交到 Git）
-├── .env.local.example       ← 环境变量模板
-├── .gitignore               ← 添加 .env.local
-├── package.json             ← 已添加 firebase 依赖
-├── tailwind.config.js
-└── postcss.config.js
+│   └── globals.css          # 全局样式
+├── .env.local               # 本地环境变量（不提交到 Git）
+├── .env.local.example       # 环境变量模板
+├── package.json             # 项目依赖
+├── tailwind.config.js       # Tailwind 配置
+└── postcss.config.js        # PostCSS 配置
 ```
 
 ## 🔥 第一步：创建 Firebase 项目
