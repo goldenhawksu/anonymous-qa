@@ -472,7 +472,8 @@ function UserView({ roomId }) {
         votes: 0,
         timestamp: Date.now(),
         votedBy: {},
-        replies: {}
+        replies: {},
+        creatorId: deviceId  // 记录创建者的设备 ID，用于允许用户删除自己的问题
       };
 
       console.log('📤 正在提交问题到会议室:', roomId);
@@ -580,6 +581,33 @@ function UserView({ roomId }) {
       ...prev,
       [questionId]: !prev[questionId]
     }));
+  };
+
+  // 用户删除自己的问题
+  const handleUserDelete = async (questionId) => {
+    // 🔒 速率限制检查
+    const rateLimitCheck = rateLimiters.userDelete.canPerformAction('userDelete');
+    if (!rateLimitCheck.allowed) {
+      setError(rateLimitCheck.message);
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
+    if (confirm('确定要删除这个问题吗？删除后无法恢复。')) {
+      try {
+        const questionRef = ref(database, `rooms/${roomId}/questions/${questionId}`);
+        await remove(questionRef);
+        console.log('✅ 问题已删除');
+      } catch (error) {
+        console.error('❌ 删除失败:', error);
+        setError(`删除失败: ${error.message}`);
+      }
+    }
+  };
+
+  // 检查是否是问题的创建者
+  const isCreator = (question) => {
+    return question.creatorId && question.creatorId === deviceId;
   };
 
   const sortedQuestions = [...questions].sort((a, b) => b.votes - a.votes);
@@ -701,8 +729,19 @@ function UserView({ roomId }) {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ delay: index * 0.05 }}
-                className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 border-2 border-gray-100 hover:border-purple-200 transition-all"
+                className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 border-2 border-gray-100 hover:border-purple-200 transition-all relative group"
               >
+                {/* 删除按钮 - 仅创建者可见 */}
+                {isCreator(question) && (
+                  <button
+                    onClick={() => handleUserDelete(question.id)}
+                    className="absolute top-2 right-2 sm:top-3 sm:right-3 p-1.5 sm:p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-all opacity-0 group-hover:opacity-100"
+                    title="删除此问题"
+                  >
+                    <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                  </button>
+                )}
+
                 <div className="flex gap-3 sm:gap-4">
                   <button
                     onClick={() => handleVote(question.id)}
@@ -727,6 +766,13 @@ function UserView({ roomId }) {
                           minute: '2-digit'
                         })}
                       </p>
+
+                      {/* 创建者标识 */}
+                      {isCreator(question) && (
+                        <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
+                          我的问题
+                        </span>
+                      )}
 
                       {/* 回复按钮 */}
                       <button
