@@ -192,6 +192,6 @@ A: 检查环境变量名称是否完全一致（包括 NEXT_PUBLIC_ 前缀）
 
 您也可以通过微信或支付宝赞赏：
 
-<img src="[这里换成你的赞赏码图片链接]" alt="赞赏码" width="200">
+<img src="https://get.spdt.work/FreeAI_pay.jpg" alt="赞赏码" width="200">
 
 非常感谢每一位支持者！
