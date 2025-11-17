@@ -176,3 +176,22 @@ A: 检查环境变量名称是否完全一致（包括 NEXT_PUBLIC_ 前缀）
 - 导出问题列表
 - 设置会议房间（多会议支持）
 
+---
+
+## 授权许可 & 支持项目
+
+本项在 **[MIT License](LICENSE)** 许可下完全开源，您可以自由地在任何个人或商业项目中使用。
+
+我投入了业余时间来开发和维护这个项目。如果它帮助到了您，或者在您的商业产品中创造了价值，我将非常高兴您能考虑**请我喝杯咖啡** ☕️ 来支持我的工作。
+
+您的支持是我持续更新、修复 Bug 和添加新功能的最大动力！
+
+<a href="https://buymeacoffee.com/suweihongc">
+  <img src="https://www.buymeacoffee.com/assets/img/guidelines/download-assets-sm-2.svg" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;" >
+</a>
+
+您也可以通过微信或支付宝赞赏：
+
+<img src="[这里换成你的赞赏码图片链接]" alt="赞赏码" width="200">
+
+非常感谢每一位支持者！
