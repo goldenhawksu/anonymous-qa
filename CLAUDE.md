@@ -13,9 +13,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **实时同步**：基于 Firebase Realtime Database 的实时数据同步
 - **防重复投票**：使用设备 ID 机制防止同一设备多次投票
 - **交互式回复**：用户可以对问题进行回复和讨论
-- **速率限制**：客户端防滥用机制（提问、投票、回复、创建会议室）
+- **用户自行删除**：用户可以删除自己提交的问题（带二次确认和速率限制）
+- **速率限制**：客户端防滥用机制（提问、投票、回复、创建会议室、用户删除）
 - **管理功能**：密码保护的管理模式，支持删除问题、清空所有问题、清理闲置会议室
 - **会议室管理**：最近访问历史、一键创建/切换会议室、复制房间链接
+- **主题切换**：白天/黑夜模式,设置持久化到 localStorage
+- **国际化支持**：中英文双语界面,语言设置持久化到 localStorage
 - **响应式设计**：完整支持手机、平板、桌面和大屏显示
 
 ## 技术栈
@@ -38,7 +41,9 @@ anonymous-qa/
 ├── lib/
 │   ├── firebase.js          # Firebase 初始化和配置
 │   ├── rateLimit.js         # 客户端速率限制器（防滥用）
-│   └── roomCleanup.js       # 会议室自动清理工具
+│   ├── roomCleanup.js       # 会议室自动清理工具
+│   ├── themes.js            # 主题配置（白天/黑夜模式）
+│   └── i18n.js              # 国际化配置（中英文）
 ├── pages/
 │   ├── _app.js              # Next.js 应用入口
 │   └── index.js             # 主应用（用户视图 + 大屏视图 + 会议室管理）
@@ -104,6 +109,7 @@ Firebase Realtime Database 结构（多会议室架构）：
           "text": "问题文本",
           "votes": 0,
           "timestamp": 1234567890,
+          "creatorId": "device_xxx123_1699999999",
           "votedBy": {
             "device_id_1": true,
             "device_id_2": true
@@ -131,6 +137,7 @@ Firebase Realtime Database 结构（多会议室架构）：
 - `text` (string): 问题内容，1-500 字符
 - `votes` (number): 当前票数（同问数）
 - `timestamp` (number): 创建时间戳
+- `creatorId` (string): 创建者的设备 ID，用于用户自行删除功能
 - `votedBy` (object): 投票记录，key 为设备 ID，value 为 true
 - `replies` (object): 回复列表，key 为回复 ID
 
@@ -143,9 +150,10 @@ Firebase Realtime Database 结构（多会议室架构）：
 
 ```
 用户访问 /?room=房间名 → 动态切换会议室
-用户提交问题 → Firebase /rooms/{roomId}/questions → 实时同步到所有连接的客户端
+用户提交问题 → Firebase /rooms/{roomId}/questions（含 creatorId）→ 实时同步到所有连接的客户端
 用户投票 → 更新 votes 和 votedBy → 实时同步排序
 用户回复 → Firebase /rooms/{roomId}/questions/{questionId}/replies → 实时显示
+用户删除自己的问题 → 验证 creatorId → Firebase remove() → 所有客户端自动更新
 管理员删除 → Firebase remove() → 所有客户端自动更新
 ```
 
@@ -394,3 +402,73 @@ useEffect(() => {
 - **跨平台**：同一 URL，自动适配手机、平板、大屏
 - **实时协作**：多设备同时使用，数据实时同步
 - **简洁高效**：单文件组件架构，代码清晰易维护
+
+## 主题系统和国际化
+
+### 主题切换（白天/黑夜模式）
+
+**关键文件：**
+- `lib/themes.js` - 主题配置
+- `pages/index.js` - 主题状态管理和应用
+
+**主题配置结构：**
+```javascript
+{
+  light: { gradient, cardBg, textPrimary, ... },
+  dark: { gradient, cardBg, textPrimary, ... }
+}
+```
+
+**重要注意事项 - Tailwind CSS JIT 限制：**
+
+⚠️ **禁止使用动态类名插值：**
+```javascript
+// ❌ 错误 - Tailwind JIT 无法编译
+className={`bg-gradient-to-br ${currentTheme.gradient}`}
+className={`bg-${color}-900`}
+
+// ✅ 正确 - 使用条件表达式
+className={`bg-gradient-to-br ${theme === 'dark' ? 'from-gray-900 via-slate-900 to-zinc-900' : 'from-purple-50 via-blue-50 to-pink-50'}`}
+```
+
+**原理：** Tailwind 的 JIT 编译器在构建时扫描源代码提取完整的类名字符串。动态变量值在编译时不可见，因此这些类名的 CSS 不会被生成。
+
+**Props 传递规则：**
+```javascript
+// ❌ 错误 - 传递主题对象
+<UserView theme={currentTheme} />  // currentTheme 是对象
+
+// ✅ 正确 - 传递主题字符串
+<UserView theme={theme} />  // theme 是 'dark' 或 'light'
+```
+
+**子组件内部自己调用 `getTheme(theme)` 来获取主题对象。**
+
+### 国际化（中英文切换）
+
+**关键文件：**
+- `lib/i18n.js` - 多语言配置
+- `pages/index.js` - 语言状态管理
+
+**语言配置结构：**
+```javascript
+{
+  zh: { title: '标题', subtitle: '副标题', ... },
+  en: { title: 'Title', subtitle: 'Subtitle', ... }
+}
+```
+
+**使用方式：**
+```javascript
+const [language, setLanguage] = useState('zh');
+const t = (key) => translations[language][key] || key;
+
+<h1>{t('title')}</h1>  // 根据当前语言显示
+```
+
+### 持久化
+
+两个功能都使用 `localStorage` 保持用户偏好：
+- `localStorage.getItem('theme')` - 'light' 或 'dark'
+- `localStorage.getItem('language')` - 'zh' 或 'en'
+

@@ -2,11 +2,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquarePlus, TrendingUp, Users, Monitor, Trash2, AlertCircle, Lock, LogOut, MessageCircle, Send, DoorOpen, X, Plus, Home as HomeIcon, Clock, Copy, Check } from 'lucide-react';
+import { MessageSquarePlus, TrendingUp, Users, Monitor, Trash2, AlertCircle, Lock, LogOut, MessageCircle, Send, DoorOpen, X, Plus, Home as HomeIcon, Clock, Copy, Check, Languages, Palette } from 'lucide-react';
 import { database } from '../lib/firebase';
 import { ref, push, onValue, set, update, remove } from 'firebase/database';
 import { rateLimiters } from '../lib/rateLimit';
 import { cleanupStaleRooms, formatCleanupResult } from '../lib/roomCleanup';
+import { translations, t } from '../lib/i18n';
+import { themes, getThemeList, getTheme } from '../lib/themes';
 
 export default function Home() {
   const router = useRouter();
@@ -17,6 +19,10 @@ export default function Home() {
   const [recentRooms, setRecentRooms] = useState([]);
   const [showWelcome, setShowWelcome] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // 语言和主题状态
+  const [language, setLanguage] = useState('zh'); // 'zh' or 'en'
+  const [theme, setTheme] = useState('light'); // 'light' or 'dark'
 
   // 从 URL 获取房间 ID
   useEffect(() => {
@@ -35,12 +41,24 @@ export default function Home() {
     }
   }, [router.isReady, router.query]);
 
-  // 加载最近访问的房间
+  // 加载最近访问的房间、语言和主题设置
   useEffect(() => {
     try {
       const saved = localStorage.getItem('recentRooms');
       if (saved) {
         setRecentRooms(JSON.parse(saved));
+      }
+
+      // 加载语言设置
+      const savedLang = localStorage.getItem('language');
+      if (savedLang && (savedLang === 'zh' || savedLang === 'en')) {
+        setLanguage(savedLang);
+      }
+
+      // 加载主题设置
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme && themes[savedTheme]) {
+        setTheme(savedTheme);
       }
 
       // 检查是否首次访问
@@ -50,7 +68,7 @@ export default function Home() {
         localStorage.setItem('hasVisited', 'true');
       }
     } catch (error) {
-      console.error('加载会议室历史失败:', error);
+      console.error(t('loadSettingsFailed', language) + ':', error);
     }
   }, []);
 
@@ -72,7 +90,7 @@ export default function Home() {
       localStorage.setItem('recentRooms', JSON.stringify(rooms));
       setRecentRooms(rooms);
     } catch (error) {
-      console.error('保存会议室历史失败:', error);
+      console.error(t('saveRoomHistoryFailed', language) + ':', error);
     }
   };
 
@@ -110,53 +128,71 @@ export default function Home() {
 
   // 清除最近访问记录
   const clearRecentRooms = () => {
-    if (confirm('确定要清除所有最近访问记录吗?')) {
+    const confirmText = t('clearRecentConfirm', language);
+    if (confirm(confirmText)) {
       try {
         localStorage.removeItem('recentRooms');
         setRecentRooms([]);
       } catch (error) {
-        console.error('清除历史记录失败:', error);
+        console.error(t('clearHistoryFailed', language) + ':', error);
       }
     }
   };
 
+  // 切换语言
+  const toggleLanguage = () => {
+    const newLang = language === 'zh' ? 'en' : 'zh';
+    setLanguage(newLang);
+    localStorage.setItem('language', newLang);
+  };
+
+  // 切换主题（白天/黑夜切换）
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+  };
+
+  // 获取当前主题配置
+  const currentTheme = getTheme(theme);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
+    <div className={`min-h-screen bg-gradient-to-br ${theme === 'dark' ? 'from-gray-900 via-slate-900 to-zinc-900' : 'from-purple-50 via-blue-50 to-pink-50'}`}>
       {/* 欢迎引导弹窗 */}
       {showWelcome && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-2xl p-6 sm:p-8 shadow-2xl max-w-lg w-full"
+            className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 sm:p-8 shadow-2xl max-w-lg w-full`}
           >
             <div className="text-center">
               <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl mx-auto mb-4 flex items-center justify-center">
                 <DoorOpen className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">欢迎使用</h2>
+              <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-800'} mb-4`}>{t('welcome', language)}</h2>
               <div className="text-left space-y-3 mb-6">
-                <p className="text-gray-600">
-                  <strong>🏠 多会议室支持：</strong>为每个会议创建独立房间
+                <p className={theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}>
+                  {t('welcomeFeature1', language)}
                 </p>
-                <p className="text-gray-600">
-                  <strong>💬 实时互动：</strong>提问、投票、回复操作实时同步
+                <p className={theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}>
+                  {t('welcomeFeature2', language)}
                 </p>
-                <p className="text-gray-600">
-                  <strong>📺 大屏展示：</strong>会议室大屏显示热门问题
+                <p className={theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}>
+                  {t('welcomeFeature3', language)}
                 </p>
               </div>
-              <div className="bg-purple-50 rounded-xl p-4 mb-6">
-                <p className="text-sm text-purple-800 font-medium mb-2">💡 快速开始：</p>
-                <p className="text-sm text-purple-700">
-                  点击左上角的 <strong>"会议室: CTS-MR25"</strong> 按钮,创建或切换到其他会议室
+              <div className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-purple-50'} rounded-xl p-4 mb-6`}>
+                <p className={`text-sm font-medium mb-2 ${theme === 'dark' ? 'text-purple-300' : 'text-purple-800'}`}>{t('welcomeTip', language)}</p>
+                <p className={`text-sm ${theme === 'dark' ? 'text-purple-200' : 'text-purple-700'}`}>
+                  {t('clickTopLeft', language)} <strong>"{t('room', language)}: CTS-MR25"</strong> {t('roomButtonText', language)}
                 </p>
               </div>
               <button
                 onClick={() => setShowWelcome(false)}
                 className="w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-medium hover:shadow-lg transition-all"
               >
-                开始使用
+                {t('startUsing', language)}
               </button>
             </div>
           </motion.div>
@@ -169,46 +205,46 @@ export default function Home() {
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-2xl p-6 sm:p-8 shadow-2xl max-w-md w-full max-h-[80vh] overflow-y-auto"
+            className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 sm:p-8 shadow-2xl max-w-md w-full max-h-[80vh] overflow-y-auto`}
           >
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${theme === 'dark' ? 'bg-purple-900' : 'bg-purple-100'}`}>
                   <DoorOpen className="w-5 h-5 text-purple-600" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-gray-800">会议室管理</h2>
-                  <p className="text-xs text-gray-500">当前: {roomId}</p>
+                  <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>{t('roomManagement', language)}</h2>
+                  <p className={`text-xs ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>{t('currentRoom', language)}: {roomId}</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowRoomManager(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className={`p-2 rounded-lg transition-colors ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
               >
-                <X className="w-5 h-5 text-gray-500" />
+                <X className={`w-5 h-5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} />
               </button>
             </div>
 
             {/* 当前房间信息 */}
-            <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border-2 border-purple-200">
+            <div className={`mb-6 p-4 rounded-xl border-2 ${theme === 'dark' ? 'bg-gradient-to-r from-purple-900 to-pink-900 border-purple-700' : 'bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200'}`}>
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <p className="text-xs text-purple-600 font-medium mb-1">当前会议室</p>
-                  <p className="text-lg font-bold text-purple-900">{roomId}</p>
+                  <p className={`text-xs font-medium mb-1 ${theme === 'dark' ? 'text-purple-300' : 'text-purple-600'}`}>{t('currentRoomLabel', language)}</p>
+                  <p className={`text-lg font-bold ${theme === 'dark' ? 'text-purple-100' : 'text-purple-900'}`}>{roomId}</p>
                 </div>
                 <button
                   onClick={copyRoomLink}
-                  className="px-3 py-2 bg-white rounded-lg hover:bg-purple-100 transition-colors flex items-center gap-2 text-sm"
+                  className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-white hover:bg-purple-100'}`}
                 >
                   {copied ? (
                     <>
                       <Check className="w-4 h-4 text-green-600" />
-                      <span className="text-green-600">已复制</span>
+                      <span className="text-green-600">{t('copied', language)}</span>
                     </>
                   ) : (
                     <>
                       <Copy className="w-4 h-4 text-purple-600" />
-                      <span className="text-purple-600">复制链接</span>
+                      <span className="text-purple-600">{t('copyLink', language)}</span>
                     </>
                   )}
                 </button>
@@ -217,9 +253,9 @@ export default function Home() {
 
             {/* 创建新房间 */}
             <div className="mb-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+              <h3 className={`text-sm font-medium mb-2 flex items-center gap-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
                 <Plus className="w-4 h-4" />
-                创建新会议室
+                {t('createNewRoom', language)}
               </h3>
               <div className="flex gap-2">
                 <input
@@ -227,35 +263,35 @@ export default function Home() {
                   value={newRoomInput}
                   onChange={(e) => setNewRoomInput(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && createNewRoom()}
-                  placeholder="输入会议室名称（英文/数字）"
+                  placeholder={t('enterRoomNamePlaceholder', language)}
                   maxLength={50}
-                  className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-400 focus:outline-none text-sm"
+                  className={`flex-1 px-4 py-2 border-2 rounded-lg focus:border-purple-400 focus:outline-none text-sm ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-gray-100' : 'bg-white border-gray-200 text-gray-800'}`}
                 />
                 <button
                   onClick={createNewRoom}
                   disabled={!newRoomInput.trim()}
                   className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  创建
+                  {t('create', language)}
                 </button>
               </div>
-              <p className="text-xs text-gray-500 mt-2">
-                会议室名只能包含字母、数字、下划线和连字符
+              <p className={`text-xs mt-2 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>
+                {t('roomNameRule', language)}
               </p>
             </div>
 
             {/* 快捷房间 */}
             <div className="mb-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+              <h3 className={`text-sm font-medium mb-2 flex items-center gap-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
                 <HomeIcon className="w-4 h-4" />
-                快捷访问
+                {t('quickAccess', language)}
               </h3>
               <button
                 onClick={() => switchToRoom('CTS-MR25')}
                 className={`w-full px-4 py-3 rounded-lg transition-all text-left ${
                   roomId === 'CTS-MR25'
                     ? 'bg-purple-100 border-2 border-purple-300'
-                    : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
+                    : `${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'} border-2 border-transparent`
                 }`}
               >
                 <div className="flex items-center justify-between">
@@ -264,12 +300,12 @@ export default function Home() {
                       <HomeIcon className="w-4 h-4 text-white" />
                     </div>
                     <div>
-                      <p className="font-medium text-gray-800">默认会议室</p>
-                      <p className="text-xs text-gray-500">CTS-MR25 公共问答区</p>
+                      <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>{t('defaultRoom', language)}</p>
+                      <p className={`text-xs ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>{t('defaultRoomDesc', language)}</p>
                     </div>
                   </div>
                   {roomId === 'CTS-MR25' && (
-                    <span className="text-xs text-purple-600 font-medium">当前</span>
+                    <span className="text-xs text-purple-600 font-medium">{t('currentRoom', language)}</span>
                   )}
                 </div>
               </button>
@@ -279,17 +315,17 @@ export default function Home() {
             {recentRooms.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <h3 className={`text-sm font-medium flex items-center gap-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
                     <Clock className="w-4 h-4" />
-                    最近访问
+                    {t('recentVisit', language)}
                   </h3>
                   <button
                     onClick={clearRecentRooms}
-                    className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 px-2 py-1 hover:bg-red-50 rounded transition-colors"
-                    title="清除所有历史记录"
+                    className={`text-xs text-red-500 hover:text-red-700 flex items-center gap-1 px-2 py-1 rounded transition-colors ${theme === 'dark' ? 'hover:bg-red-900' : 'hover:bg-red-50'}`}
+                    title={t('clearAllHistory', language)}
                   >
                     <Trash2 className="w-3 h-3" />
-                    <span>清除</span>
+                    <span>{t('clear', language)}</span>
                   </button>
                 </div>
                 <div className="space-y-2">
@@ -300,7 +336,7 @@ export default function Home() {
                       className={`w-full px-4 py-3 rounded-lg transition-all text-left ${
                         roomId === room
                           ? 'bg-purple-100 border-2 border-purple-300'
-                          : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
+                          : `${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'} border-2 border-transparent`
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -308,10 +344,10 @@ export default function Home() {
                           <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-400 rounded-lg flex items-center justify-center">
                             <DoorOpen className="w-4 h-4 text-white" />
                           </div>
-                          <p className="font-medium text-gray-800">{room}</p>
+                          <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>{room}</p>
                         </div>
                         {roomId === room && (
-                          <span className="text-xs text-purple-600 font-medium">当前</span>
+                          <span className="text-xs text-purple-600 font-medium">{t('currentRoom', language)}</span>
                         )}
                       </div>
                     </button>
@@ -324,7 +360,7 @@ export default function Home() {
       )}
 
       {/* 顶部导航栏 */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-sm border-b border-gray-200">
+      <div className={`fixed top-0 left-0 right-0 z-50 ${theme === 'dark' ? 'bg-gray-800/80 border-gray-700' : 'bg-white/80 border-gray-200'} backdrop-blur-sm border-b`}>
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           {/* 左侧：房间按钮 */}
           <button
@@ -333,46 +369,71 @@ export default function Home() {
           >
             <DoorOpen className="w-4 h-4" />
             <span className="font-medium text-sm sm:text-base max-w-[120px] sm:max-w-none truncate">
-              <span className="hidden sm:inline">会议室: </span>{roomId}
+              <span className="hidden sm:inline">{t('room', language)}: </span>{roomId}
             </span>
             <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
           </button>
 
-          {/* 右侧：视图切换 */}
-          <div className="flex gap-2">
+          {/* 右侧：语言、主题、视图切换 */}
+          <div className="flex gap-2 items-center">
+            {/* 语言切换按钮 */}
+            <button
+              onClick={toggleLanguage}
+              className={`p-2 rounded-full transition-all border ${theme === 'dark' ? 'bg-gray-800 text-gray-100 hover:bg-gray-700 border-gray-600' : 'bg-white text-gray-800 hover:bg-gray-100 border-gray-200'}`}
+              title={t('switchLanguage', language)}
+            >
+              {language === 'zh' ? 'EN' : '中'}
+            </button>
+
+            {/* 主题切换按钮 */}
+            <button
+              onClick={toggleTheme}
+              className={`p-2 rounded-full transition-all border ${theme === 'dark' ? 'bg-gray-800 text-gray-100 hover:bg-gray-700 border-gray-600' : 'bg-white text-gray-800 hover:bg-gray-100 border-gray-200'}`}
+              title={t('switchTheme', language)}
+            >
+              {theme === 'light' ? '🌙' : '☀️'}
+            </button>
+
+            {/* 视图切换 */}
             <button
               onClick={() => setView('user')}
               className={`px-3 sm:px-4 py-2 rounded-full font-medium transition-all text-sm ${
                 view === 'user'
                   ? 'bg-purple-600 text-white shadow-lg'
-                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                  : `border ${theme === 'dark' ? 'bg-gray-800 text-gray-100 hover:bg-gray-700 border-gray-600' : 'bg-white text-gray-800 hover:bg-gray-100 border-gray-200'}`
               }`}
             >
               <Users className="inline-block w-4 h-4 sm:mr-2" />
-              <span className="hidden sm:inline">用户视图</span>
+              <span className="hidden sm:inline">{t('userView', language)}</span>
             </button>
             <button
               onClick={() => setView('display')}
               className={`px-3 sm:px-4 py-2 rounded-full font-medium transition-all text-sm ${
                 view === 'display'
                   ? 'bg-blue-600 text-white shadow-lg'
-                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                  : `border ${theme === 'dark' ? 'bg-gray-800 text-gray-100 hover:bg-gray-700 border-gray-600' : 'bg-white text-gray-800 hover:bg-gray-100 border-gray-200'}`
               }`}
             >
               <Monitor className="inline-block w-4 h-4 sm:mr-2" />
-              <span className="hidden sm:inline">大屏视图</span>
+              <span className="hidden sm:inline">{t('displayView', language)}</span>
             </button>
           </div>
         </div>
       </div>
 
-      {view === 'user' ? <UserView roomId={roomId} /> : <DisplayView roomId={roomId} />}
+      {view === 'user' ? (
+        <UserView roomId={roomId} language={language} theme={theme} />
+      ) : (
+        <DisplayView roomId={roomId} language={language} theme={theme} />
+      )}
     </div>
   );
 }
 
 // 用户提问界面（手机端）
-function UserView({ roomId }) {
+function UserView({ roomId, language, theme }) {
+  const currentTheme = getTheme(theme);
+
   const [questions, setQuestions] = useState([]);
   const [newQuestion, setNewQuestion] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -441,7 +502,7 @@ function UserView({ roomId }) {
 
     // 🔒 会议室问题数量限制检查（100个上限）
     if (questions.length >= 100) {
-      setError('当前会议室已达到最大问题数量限制（100个），请等待管理员清理或切换到其他会议室');
+      setError(t('questionLimitReached', language));
       return;
     }
 
@@ -457,10 +518,10 @@ function UserView({ roomId }) {
 
       // 验证文本长度
       if (questionText.length === 0) {
-        throw new Error('问题不能为空');
+        throw new Error(t('questionEmpty', language));
       }
       if (questionText.length > 500) {
-        throw new Error('问题长度不能超过500字符');
+        throw new Error(t('questionTooLong', language));
       }
 
       const questionsRef = ref(database, `rooms/${roomId}/questions`);
@@ -486,12 +547,12 @@ function UserView({ roomId }) {
     } catch (error) {
       console.error('❌ 提交失败:', error);
 
-      let errorMessage = '提交失败: ';
+      let errorMessage = t('submitFailed', language) + ': ';
 
       if (error.code === 'PERMISSION_DENIED') {
-        errorMessage += '权限被拒绝。请检查 Firebase 安全规则设置。';
+        errorMessage += t('permissionDenied', language);
       } else if (error.message.includes('network')) {
-        errorMessage += '网络错误，请检查网络连接。';
+        errorMessage += t('networkError', language);
       } else {
         errorMessage += error.message;
       }
@@ -593,7 +654,7 @@ function UserView({ roomId }) {
       return;
     }
 
-    if (confirm('确定要删除这个问题吗？删除后无法恢复。')) {
+    if (confirm(t('deleteConfirm', language))) {
       try {
         const questionRef = ref(database, `rooms/${roomId}/questions/${questionId}`);
         await remove(questionRef);
@@ -623,27 +684,37 @@ function UserView({ roomId }) {
         <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl mb-4 shadow-lg">
           <MessageSquarePlus className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
         </div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">I CAN, We WILL</h1>
-        <p className="text-sm sm:text-base text-gray-600">畅所欲言，同问支持</p>
+        <h1
+          className={`text-2xl sm:text-3xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}
+          style={theme === 'dark' ? { color: '#ffffff' } : {}}
+        >
+          {t('title', language)}
+        </h1>
+        <p
+          className={`text-sm sm:text-base ${theme === 'dark' ? 'text-gray-200' : 'text-gray-600'}`}
+          style={theme === 'dark' ? { color: '#e5e7eb' } : {}}
+        >
+          {t('subtitle', language)}
+        </p>
 
         {/* 连接状态 */}
         <div className="mt-2">
           {connectionStatus === 'connected' && (
             <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-100 text-green-700 rounded-full text-xs sm:text-sm">
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-              实时同步中
+              {t('connected', language)}
             </div>
           )}
           {connectionStatus === 'connecting' && (
             <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-yellow-100 text-yellow-700 rounded-full text-xs sm:text-sm">
               <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
-              连接中...
+              {t('connecting', language)}
             </div>
           )}
           {connectionStatus === 'error' && (
             <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-red-100 text-red-700 rounded-full text-xs sm:text-sm">
               <AlertCircle className="w-4 h-4" />
-              连接失败
+              {t('connectionFailed', language)}
             </div>
           )}
         </div>
@@ -680,17 +751,17 @@ function UserView({ roomId }) {
         onSubmit={handleSubmit}
         className="mb-6 sm:mb-8"
       >
-        <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-6 border-2 border-purple-100">
+        <div className={`rounded-2xl shadow-xl p-4 sm:p-6 border-2 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-purple-100'}`}>
           <textarea
             value={newQuestion}
             onChange={(e) => setNewQuestion(e.target.value)}
-            placeholder="输入你的问题..."
+            placeholder={t('questionPlaceholder', language)}
             maxLength={500}
-            className="w-full px-3 sm:px-4 py-2 sm:py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none resize-none text-gray-800 placeholder-gray-400 text-sm sm:text-base"
+            className={`w-full px-3 sm:px-4 py-2 sm:py-3 border-2 rounded-xl focus:border-purple-400 focus:outline-none resize-none placeholder-gray-400 text-sm sm:text-base ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-gray-100' : 'bg-white border-gray-200 text-gray-800'}`}
             rows="4"
           />
           <div className="flex items-center justify-between mt-2">
-            <span className="text-xs text-gray-400">
+            <span className={`text-xs ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>
               {newQuestion.length}/500
             </span>
           </div>
@@ -699,9 +770,7 @@ function UserView({ roomId }) {
             disabled={!newQuestion.trim() || isSubmitting || connectionStatus !== 'connected'}
             className="w-full mt-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-2.5 sm:py-3 rounded-xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
           >
-            {isSubmitting ? '提交中...' :
-             connectionStatus !== 'connected' ? '等待连接...' :
-             '提交问题'}
+            {isSubmitting ? t('submitting', language) : connectionStatus !== 'connected' ? t('waitingConnection', language) : t('submitQuestion', language)}
           </button>
         </div>
       </motion.form>
@@ -709,8 +778,13 @@ function UserView({ roomId }) {
       {/* 问题列表 */}
       <div className="space-y-3 sm:space-y-4">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg sm:text-xl font-bold text-gray-800">所有问题</h2>
-          <span className="text-xs sm:text-sm text-gray-500">{questions.length} 个问题</span>
+          <h2
+            className={`text-lg sm:text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}
+            style={theme === 'dark' ? { color: '#ffffff' } : {}}
+          >
+            {t('allQuestions', language)}
+          </h2>
+          <span className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>{questions.length} {t('questionsCount', language)}</span>
         </div>
 
         <AnimatePresence>
@@ -729,14 +803,14 @@ function UserView({ roomId }) {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ delay: index * 0.05 }}
-                className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 border-2 border-gray-100 hover:border-purple-200 transition-all relative group"
+                className={`rounded-2xl shadow-lg p-4 sm:p-6 border-2 hover:border-purple-200 transition-all relative group ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}
               >
                 {/* 删除按钮 - 仅创建者可见 */}
                 {isCreator(question) && (
                   <button
                     onClick={() => handleUserDelete(question.id)}
                     className="absolute top-2 right-2 sm:top-3 sm:right-3 p-1.5 sm:p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-all opacity-0 group-hover:opacity-100"
-                    title="删除此问题"
+                    title={t('deleteThisQuestion', language)}
                   >
                     <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
                   </button>
@@ -748,7 +822,7 @@ function UserView({ roomId }) {
                     className={`flex flex-col items-center justify-center min-w-14 h-14 sm:min-w-16 sm:h-16 rounded-xl transition-all ${
                       hasVoted(question)
                         ? 'bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-lg scale-105'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        : `${theme === 'dark' ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`
                     }`}
                   >
                     <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 mb-1" />
@@ -756,9 +830,9 @@ function UserView({ roomId }) {
                   </button>
 
                   <div className="flex-1 min-w-0">
-                    <p className="text-gray-800 text-base sm:text-lg leading-relaxed break-words">{question.text}</p>
+                    <p className={`text-base sm:text-lg leading-relaxed break-words ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>{question.text}</p>
                     <div className="flex items-center gap-3 mt-2">
-                      <p className="text-xs text-gray-400">
+                      <p className={`text-xs ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>
                         {new Date(question.timestamp).toLocaleString('zh-CN', {
                           month: '2-digit',
                           day: '2-digit',
@@ -780,7 +854,7 @@ function UserView({ roomId }) {
                         className="text-xs text-purple-600 hover:text-purple-800 flex items-center gap-1"
                       >
                         <MessageCircle className="w-3 h-3" />
-                        {replyCount > 0 ? `${replyCount} 条回复` : '回复'}
+                        {replyCount > 0 ? `${replyCount} ${t('replies', language)}` : t('reply', language)}
                       </button>
                     </div>
 
@@ -814,7 +888,7 @@ function UserView({ roomId }) {
                               type="text"
                               value={replyText}
                               onChange={(e) => setReplyText(e.target.value)}
-                              placeholder="输入回复..."
+                              placeholder={t('replyPlaceholder', language)}
                               maxLength={200}
                               className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-400 focus:outline-none text-sm"
                               autoFocus
@@ -866,7 +940,9 @@ function UserView({ roomId }) {
 }
 
 // 大屏展示界面（带密码保护）
-function DisplayView({ roomId }) {
+function DisplayView({ roomId, language, theme }) {
+  const currentTheme = getTheme(theme);
+
   const [questions, setQuestions] = useState([]);
   const [showAdmin, setShowAdmin] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -912,7 +988,7 @@ function DisplayView({ roomId }) {
 
   const handleAdminClick = () => {
     if (!ADMIN_PASSWORD) {
-      alert('管理员密码未配置！请在环境变量中设置 NEXT_PUBLIC_ADMIN_PASSWORD');
+      alert(t('adminPasswordNotSet', language));
       return;
     }
 
@@ -938,7 +1014,7 @@ function DisplayView({ roomId }) {
       // 在 sessionStorage 中保存认证状态（刷新页面后失效，更安全）
       sessionStorage.setItem('adminAuth', 'true');
     } else {
-      setPasswordError('密码错误！');
+      setPasswordError(t('passwordError', language));
       setPasswordInput('');
     }
   };
@@ -959,11 +1035,11 @@ function DisplayView({ roomId }) {
 
   const handleDelete = async (questionId) => {
     if (!isAuthenticated) {
-      alert('需要管理员权限');
+      alert(t('needAdminPermission', language));
       return;
     }
 
-    if (confirm('确定要删除这个问题吗？')) {
+    if (confirm(t('deleteQuestionConfirm', language))) {
       try {
         const questionRef = ref(database, `rooms/${roomId}/questions/${questionId}`);
         await remove(questionRef);
@@ -976,15 +1052,15 @@ function DisplayView({ roomId }) {
 
   const handleClearAll = async () => {
     if (!isAuthenticated) {
-      alert('需要管理员权限');
+      alert(t('needAdminPermission', language));
       return;
     }
 
-    if (confirm('确定要清空所有问题吗？此操作不可恢复！')) {
+    if (confirm(t('clearAllConfirm', language))) {
       try {
         const questionsRef = ref(database, `rooms/${roomId}/questions`);
         await set(questionsRef, null);
-        alert('已清空所有问题');
+        alert(t('allQuestionsCleared', language));
         setShowAdmin(false);
       } catch (error) {
         console.error('清空失败:', error);
@@ -996,7 +1072,7 @@ function DisplayView({ roomId }) {
   // 清理闲置会议室
   const handleCleanupStaleRooms = async () => {
     if (!isAuthenticated) {
-      alert('需要管理员权限');
+      alert(t('needAdminPermission', language));
       return;
     }
 
@@ -1057,22 +1133,22 @@ function DisplayView({ roomId }) {
     .slice(0, 10);
 
   return (
-    <div className="min-h-screen p-4 sm:p-8 pt-32 sm:pt-24">
+    <div className={`min-h-screen bg-gradient-to-br ${theme === 'dark' ? 'from-gray-900 via-slate-900 to-zinc-900' : 'from-purple-50 via-blue-50 to-pink-50'} p-4 sm:p-8 pt-32 sm:pt-24`}>
       {/* 密码输入对话框 */}
       {showPasswordDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-2xl p-6 sm:p-8 shadow-2xl max-w-md w-full"
+            className={`rounded-2xl p-6 sm:p-8 shadow-2xl max-w-md w-full ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'}`}
           >
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-red-100 rounded-xl flex items-center justify-center">
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${theme === 'dark' ? 'bg-red-900' : 'bg-red-100'}`}>
                 <Lock className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
               </div>
               <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-800">管理员验证</h2>
-                <p className="text-xs sm:text-sm text-gray-600">请输入管理员密码</p>
+                <h2 className={`text-xl sm:text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>管理员验证</h2>
+                <p className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>请输入管理员密码</p>
               </div>
             </div>
 
@@ -1081,9 +1157,9 @@ function DisplayView({ roomId }) {
                 type="password"
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder="输入密码..."
+                placeholder={t('passwordPlaceholder', language)}
                 autoFocus
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-red-400 focus:outline-none text-gray-800 placeholder-gray-400 text-sm sm:text-base"
+                className={`w-full px-4 py-3 border-2 rounded-xl focus:border-red-400 focus:outline-none placeholder-gray-400 text-sm sm:text-base ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-gray-100' : 'bg-white border-gray-200 text-gray-800'}`}
               />
 
               {passwordError && (
@@ -1138,15 +1214,15 @@ function DisplayView({ roomId }) {
                     }`}
                   >
                     <Trash2 className="w-4 h-4" />
-                    <span className="hidden sm:inline">{showAdmin ? '关闭管理' : '管理模式'}</span>
-                    <span className="sm:hidden">{showAdmin ? '关闭' : '管理'}</span>
+                    <span className="hidden sm:inline">{showAdmin ? t('closeAdmin', language) : t('adminMode', language)}</span>
+                    <span className="sm:hidden">{showAdmin ? t('closeAdminShort', language) : t('adminShort', language)}</span>
                   </button>
                   <button
                     onClick={handleLogout}
                     className="px-3 sm:px-4 py-2 bg-gray-500 text-white rounded-full text-sm hover:bg-gray-600 transition-all shadow-lg flex items-center gap-2"
                   >
                     <LogOut className="w-4 h-4" />
-                    <span className="hidden sm:inline">退出</span>
+                    <span className="hidden sm:inline">{t('logout', language)}</span>
                   </button>
                 </div>
 
@@ -1160,8 +1236,8 @@ function DisplayView({ roomId }) {
                       className="px-3 sm:px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 transition-all shadow-lg flex items-center gap-2"
                     >
                       <Trash2 className="w-4 h-4" />
-                      <span className="hidden sm:inline">清空所有问题</span>
-                      <span className="sm:hidden">清空</span>
+                      <span className="hidden sm:inline">{t('clearAll', language)}</span>
+                      <span className="sm:hidden">{t('clearAllShort', language)}</span>
                     </motion.button>
 
                     <motion.button
@@ -1173,10 +1249,10 @@ function DisplayView({ roomId }) {
                     >
                       <Clock className="w-4 h-4" />
                       <span className="hidden sm:inline">
-                        {isCleaningRooms ? '清理中...' : '清理闲置会议室'}
+                        {isCleaningRooms ? t('cleaning', language) : t('cleanupStaleRooms', language)}
                       </span>
                       <span className="sm:hidden">
-                        {isCleaningRooms ? '清理中' : '清理'}
+                        {isCleaningRooms ? t('cleaningShort', language) : t('cleanupShort', language)}
                       </span>
                     </motion.button>
                   </div>
@@ -1193,13 +1269,23 @@ function DisplayView({ roomId }) {
         animate={{ opacity: 1, y: 0 }}
         className="text-center mb-8 sm:mb-12"
       >
-        <div className="inline-flex items-center gap-3 sm:gap-4 bg-white/80 backdrop-blur-sm px-4 sm:px-8 py-3 sm:py-4 rounded-3xl shadow-2xl">
+        <div className={`inline-flex items-center gap-3 sm:gap-4 backdrop-blur-sm px-4 sm:px-8 py-3 sm:py-4 rounded-3xl shadow-2xl ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-white/80'}`}>
           <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
             <MessageSquarePlus className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
           </div>
           <div className="text-left">
-            <h1 className="text-2xl sm:text-4xl font-bold text-gray-800">CTS on AIR</h1>
-            <p className="text-sm sm:text-base text-gray-600">共 {questions.length} 个问题</p>
+            <h1
+              className={`text-2xl sm:text-4xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}
+              style={theme === 'dark' ? { color: '#ffffff' } : {}}
+            >
+              CTS on AIR
+            </h1>
+            <p
+              className={`text-sm sm:text-base ${theme === 'dark' ? 'text-gray-200' : 'text-gray-600'}`}
+              style={theme === 'dark' ? { color: '#e5e7eb' } : {}}
+            >
+              {t('totalQuestions', language)} {questions.length} {t('questionUnit', language)}
+            </p>
           </div>
         </div>
 
@@ -1212,8 +1298,8 @@ function DisplayView({ roomId }) {
           >
             <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-red-100 text-red-700 rounded-full text-xs sm:text-sm mx-auto">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              <span className="hidden sm:inline">管理模式已启用 - 鼠标悬停在问题上可删除</span>
-              <span className="sm:hidden">管理模式</span>
+              <span className="hidden sm:inline">{t('adminModeEnabled', language)}</span>
+              <span className="sm:hidden">{t('adminModeShort', language)}</span>
             </div>
           </motion.div>
         )}
@@ -1234,20 +1320,20 @@ function DisplayView({ roomId }) {
                 transition={{ delay: index * 0.1 }}
                 className="relative group"
               >
-                <div className="flex items-center gap-3 sm:gap-6 bg-white/90 backdrop-blur-sm rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-2xl border-2 border-gray-100 hover:scale-102 transition-transform">
+                <div className={`flex items-center gap-3 sm:gap-6 backdrop-blur-sm rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-2xl border-2 hover:scale-102 transition-transform ${theme === 'dark' ? 'bg-gray-800/90 border-gray-700' : 'bg-white/90 border-gray-100'}`}>
                   {/* 排名 */}
                   <div className={`flex-shrink-0 w-14 h-14 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl flex items-center justify-center text-xl sm:text-3xl font-bold ${
                     index === 0 ? 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white shadow-lg' :
                     index === 1 ? 'bg-gradient-to-br from-gray-300 to-gray-400 text-white shadow-lg' :
                     index === 2 ? 'bg-gradient-to-br from-orange-300 to-orange-400 text-white shadow-lg' :
-                    'bg-gray-100 text-gray-600'
+                    `${theme === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`
                   }`}>
                     #{index + 1}
                   </div>
 
                   {/* 问题内容 */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-base sm:text-2xl text-gray-800 leading-relaxed font-medium break-words">
+                    <p className={`text-base sm:text-2xl leading-relaxed font-medium break-words ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>
                       {question.text}
                     </p>
                     {replyCount > 0 && (
@@ -1270,7 +1356,7 @@ function DisplayView({ roomId }) {
                     <button
                       onClick={() => handleDelete(question.id)}
                       className="absolute top-2 right-2 sm:top-4 sm:right-4 opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 text-white p-2 sm:p-3 rounded-lg sm:rounded-xl hover:bg-red-600 shadow-lg"
-                      title="删除此问题"
+                      title={t('deleteThisQuestion', language)}
                     >
                       <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                     </button>
