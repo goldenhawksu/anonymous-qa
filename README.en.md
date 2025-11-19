@@ -188,16 +188,6 @@ A: Click the palette icon (🎨) in the top-right corner and choose from 8 beaut
 
 ## 🌟 Features Highlights
 
-### 🎨 Customization
-- **8 Theme Options**: Choose your favorite color scheme
-  - 🌸 Purple Pink (Default)
-  - 🌊 Ocean Blue
-  - 🌅 Sunset Orange
-  - 🌲 Forest Green
-  - 💜 Lavender
-  - 🌸 Cherry Blossom
-  - ☁️ Sky Blue
-  - 🍃 Mint Green
 
 ### 🌏 Internationalization
 - **Bilingual Interface**: Full support for Chinese and English
