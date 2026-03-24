@@ -1348,7 +1348,7 @@ function DisplayView({ roomId, language, theme }) {
                   <div className="flex flex-col items-center gap-1 sm:gap-2 bg-gradient-to-br from-purple-500 to-pink-500 text-white px-4 py-3 sm:px-8 sm:py-6 rounded-xl sm:rounded-2xl shadow-lg">
                     <TrendingUp className="w-5 h-5 sm:w-8 sm:h-8" />
                     <span className="text-2xl sm:text-4xl font-bold">{question.votes || 0}</span>
-                    <span className="text-xs sm:text-sm opacity-90">同问</span>
+                    <span className="text-xs sm:text-sm opacity-90">投票</span>
                   </div>
 
                   {/* 删除按钮 */}
